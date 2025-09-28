@@ -1,39 +1,34 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Plus, FileText, Calendar, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { APP_NAME } from '@/lib/constants';
+import { useAuthStore } from '@/stores/authStore';
 
 export default function DashboardPage() {
-  const [user, setUser] = useState<any>(null);
-  const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
+  const { user, isAuthenticated, logout, setLoading } = useAuthStore();
 
   useEffect(() => {
-    // Check if user is logged in
-    const token = localStorage.getItem('token');
-    const userData = localStorage.getItem('user');
-    
-    if (!token || !userData) {
+    // Check if user is authenticated
+    if (!isAuthenticated || !user) {
       router.push('/login');
       return;
     }
-    
-    setUser(JSON.parse(userData));
-    setIsLoading(false);
-  }, [router]);
+    setLoading(false);
+  }, [isAuthenticated, user, router, setLoading]);
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+    logout();
     router.push('/login');
   };
 
-  if (isLoading) {
+  // Show loading if not authenticated
+  if (!isAuthenticated || !user) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-gray-600">Loading...</div>
@@ -52,7 +47,7 @@ export default function DashboardPage() {
             </div>
             <div className="flex items-center space-x-4">
               <span className="text-sm text-gray-600">
-                Welcome, {user?.first_name}!
+                Welcome, {user.firstName}!
               </span>
               <Button variant="outline" size="sm" onClick={handleLogout}>
                 Sign Out
@@ -118,6 +113,14 @@ export default function DashboardPage() {
               </Button>
             </CardContent>
           </Card>
+        </div>
+
+        {/* Debug info for development */}
+        <div className="mt-8 p-4 bg-gray-100 rounded-lg">
+          <h3 className="text-sm font-medium text-gray-700 mb-2">Debug Info (Development Only)</h3>
+          <pre className="text-xs text-gray-600">
+            User: {JSON.stringify(user, null, 2)}
+          </pre>
         </div>
       </main>
     </div>

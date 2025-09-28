@@ -5,12 +5,16 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useAuthStore } from '@/stores/authStore';
 
 export default function TestLoginPage() {
   const [email, setEmail] = useState('test@example.com');
   const [password, setPassword] = useState('password123');
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
+  
+  // Use our new auth store
+  const { login } = useAuthStore();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -26,9 +30,17 @@ export default function TestLoginPage() {
       const data = await response.json();
 
       if (response.ok) {
-        // Store mock data
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('user', JSON.stringify(data.user));
+        // Use our auth store instead of localStorage directly
+        const user = {
+          id: data.user.id,
+          email: data.user.email,
+          firstName: data.user.first_name,
+          lastName: data.user.last_name,
+          createdAt: data.user.created_at,
+          updatedAt: data.user.created_at,
+        };
+        
+        login(user, data.token);
         
         // Redirect to dashboard
         router.push('/dashboard');
