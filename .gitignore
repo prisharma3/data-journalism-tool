@@ -39,3 +39,23 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Google Cloud credentials
+service-account.json
+src/service-account.json
+gse-aixdesign-lab-*.json
+
+# Environment files
+.env.local
+.env.production
+.env
+.env.development
+
+# API keys and secrets
+.env.*
+!.env.example
+
+# Database
+*.db
+*.sqlite
+database.sql
