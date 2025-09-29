@@ -57,10 +57,21 @@ export default function DashboardPage() {
         const data = await response.json();
         setProjects(data.projects || []);
       } else {
-        setError('Failed to load projects');
+        // Only show error for actual server errors, not empty results
+        if (response.status >= 500) {
+          setError('Server error. Please try again later.');
+        } else if (response.status === 401) {
+          setError('Authentication failed. Please log in again.');
+          logout();
+          router.push('/login');
+        } else {
+          // For other errors (like 404), just set empty projects without error message
+          setProjects([]);
+        }
       }
     } catch (error) {
-      setError('Error loading projects');
+      // Only show error for network/connection issues
+      setError('Unable to connect to server. Please check your connection.');
       console.error('Fetch projects error:', error);
     } finally {
       setIsLoading(false);
@@ -192,17 +203,13 @@ export default function DashboardPage() {
             <p className="text-gray-600">Loading projects...</p>
           </div>
         ) : projects.length === 0 ? (
-          <div className="text-center py-12">
-            <FileText className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No projects yet</h3>
-            <p className="text-gray-600 mb-4">
-              Get started by creating your first data journalism project
-            </p>
-            <Button onClick={() => setShowCreateModal(true)}>
-              <Plus className="w-4 h-4 mr-2" />
-              Create Your First Project
-            </Button>
-          </div>
+            <div className="text-center py-12">
+              <FileText className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No projects yet</h3>
+              <p className="text-gray-600">
+                Get started by creating your first data journalism project using the button above.
+              </p>
+            </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {projects.map((project) => (

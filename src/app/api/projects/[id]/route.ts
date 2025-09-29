@@ -62,6 +62,57 @@ export async function GET(
   }
 }
 
+// PUT /api/projects/[id] - Update a project
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const userId = await getUserFromToken(request);
+    if (!userId) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
+    const projectId = params.id;
+    const { name, description } = await request.json();
+
+    if (!name) {
+      return NextResponse.json(
+        { error: 'Project name is required' },
+        { status: 400 }
+      );
+    }
+
+    // Update project and verify ownership
+    const result = await query(
+      'UPDATE projects SET name = $1, description = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3 AND user_id = $4 RETURNING id, name, description, created_at, updated_at',
+      [name, description, projectId, userId]
+    );
+
+    if (result.rows.length === 0) {
+      return NextResponse.json(
+        { error: 'Project not found' },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({
+      project: result.rows[0],
+      message: 'Project updated successfully'
+    });
+
+  } catch (error) {
+    console.error('Update project error:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}
+
 // DELETE /api/projects/[id] - Delete a project
 export async function DELETE(
   request: NextRequest,
@@ -97,50 +148,6 @@ export async function DELETE(
 
   } catch (error) {
     console.error('Delete project error:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
-  }
-}
-
-// PUT /api/projects/[id] - Update a project (for future edit functionality)
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
-  try {
-    const userId = await getUserFromToken(request);
-    if (!userId) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-
-    const projectId = params.id;
-    const { name, description } = await request.json();
-
-    // Update project and verify ownership
-    const result = await query(
-      'UPDATE projects SET name = $1, description = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3 AND user_id = $4 RETURNING id, name, description, created_at, updated_at',
-      [name, description, projectId, userId]
-    );
-
-    if (result.rows.length === 0) {
-      return NextResponse.json(
-        { error: 'Project not found' },
-        { status: 404 }
-      );
-    }
-
-    return NextResponse.json({
-      project: result.rows[0],
-      message: 'Project updated successfully'
-    });
-
-  } catch (error) {
-    console.error('Update project error:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
