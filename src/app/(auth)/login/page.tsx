@@ -1,5 +1,5 @@
 'use client';
-
+import { useAuthStore } from '@/stores/authStore';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -16,25 +16,35 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const router = useRouter();
-
+  const { login } = useAuthStore();
+  
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setError('');
-
+  
     try {
       const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
       });
-
+  
       const data = await response.json();
-
+  
       if (response.ok) {
-        // Store token (we'll improve this later)
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('user', JSON.stringify(data.user));
+        // Transform the API response to match the User interface
+        const user = {
+          id: data.user.id,
+          email: data.user.email,
+          firstName: data.user.first_name,  // Transform from API
+          lastName: data.user.last_name,    // Transform from API
+          createdAt: data.user.created_at,
+          updatedAt: data.user.updated_at,
+        };
+        
+        // Use the authStore login method
+        login(user, data.token);
         
         // Redirect to dashboard
         router.push('/dashboard');
