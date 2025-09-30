@@ -21,7 +21,7 @@ async function getUserFromToken(request: NextRequest) {
 // GET /api/projects/[id] - Get a specific project
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const userId = await getUserFromToken(request);
@@ -32,7 +32,7 @@ export async function GET(
       );
     }
 
-    const projectId = params.id;
+    const { id: projectId } = await params;
 
     // Get project and verify ownership
     const result = await query(
@@ -65,7 +65,7 @@ export async function GET(
 // PUT /api/projects/[id] - Update a project
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const userId = await getUserFromToken(request);
@@ -76,7 +76,7 @@ export async function PUT(
       );
     }
 
-    const projectId = params.id;
+    const { id: projectId } = await params;
     const { name, description } = await request.json();
 
     if (!name) {
@@ -116,7 +116,7 @@ export async function PUT(
 // DELETE /api/projects/[id] - Delete a project
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const userId = await getUserFromToken(request);
@@ -127,7 +127,7 @@ export async function DELETE(
       );
     }
 
-    const projectId = params.id;
+    const { id: projectId } = await params;
 
     // Delete project (will cascade delete all related data due to foreign key constraints)
     const result = await query(

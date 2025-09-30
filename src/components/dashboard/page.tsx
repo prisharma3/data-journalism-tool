@@ -2,85 +2,143 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, FileText, Calendar, Settings, BookOpen } from 'lucide-react';
+import { Plus, FileText, Calendar, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import { APP_NAME } from '@/lib/constants';
 import { useAuthStore } from '@/stores/authStore';
-import { useProjectStore } from '@/stores/projectStore';
+
+interface Project {
+  id: string;
+  name: string;
+  description?: string;
+  created_at: string;
+  updated_at: string;
+}
 
 export default function DashboardPage() {
   const router = useRouter();
-  const { user, isAuthenticated, logout } = useAuthStore();
-  const { setTags } = useProjectStore();
+  const { user, isAuthenticated, logout, token } = useAuthStore();
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
+  
+  // Create project modal state
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [newProjectName, setNewProjectName] = useState('');
+  const [newProjectDescription, setNewProjectDescription] = useState('');
+  const [isCreating, setIsCreating] = useState(false);
+  
+  // Delete confirmation state
+  const [deleteProjectId, setDeleteProjectId] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
-    // Check if user is authenticated
     if (!isAuthenticated || !user) {
       router.push('/login');
       return;
     }
+    fetchProjects();
+  }, [isAuthenticated, user, router]);
 
-    // Set up default tags for the project
-    const defaultTags = [
-      {
-        id: 'tag-strong-evidence',
-        projectId: 'demo-project',
-        name: 'Strong Evidence',
-        color: '#10B981',
-        createdAt: new Date().toISOString(),
-      },
-      {
-        id: 'tag-needs-investigation',
-        projectId: 'demo-project',
-        name: 'Needs Investigation',
-        color: '#F59E0B',
-        createdAt: new Date().toISOString(),
-      },
-      {
-        id: 'tag-contradictory',
-        projectId: 'demo-project',
-        name: 'Contradictory Data',
-        color: '#EF4444',
-        createdAt: new Date().toISOString(),
-      },
-      {
-        id: 'tag-neutral',
-        projectId: 'demo-project',
-        name: 'Neutral Finding',
-        color: '#6B7280',
-        createdAt: new Date().toISOString(),
-      },
-    ];
+  const fetchProjects = async () => {
+    try {
+      setIsLoading(true);
+      setError('');
+      const response = await fetch('/api/projects', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setProjects(data.projects || []);
+      } else {
+        if (response.status >= 500) {
+          setError('Server error. Please try again later.');
+        } else if (response.status === 401) {
+          setError('Authentication failed. Please log in again.');
+          logout();
+          router.push('/login');
+        } else {
+          setProjects([]);
+        }
+      }
+    } catch (error) {
+      setError('Unable to connect to server. Please check your connection.');
+      console.error('Fetch projects error:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-    setTags(defaultTags);
-  }, [isAuthenticated, user, router, setTags]);
+  const createProject = async () => {
+    if (!newProjectName.trim()) return;
+    
+    try {
+      setIsCreating(true);
+      const response = await fetch('/api/projects', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          name: newProjectName.trim(),
+          description: newProjectDescription.trim() || undefined,
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setProjects([data.project, ...projects]);
+        setShowCreateModal(false);
+        setNewProjectName('');
+        setNewProjectDescription('');
+        router.push(`/project/${data.project.id}/notebook`);
+      } else {
+        setError('Failed to create project');
+      }
+    } catch (error) {
+      setError('Error creating project');
+      console.error('Create project error:', error);
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  const deleteProject = async (projectId: string) => {
+    try {
+      setIsDeleting(true);
+      const response = await fetch(`/api/projects/${projectId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        setProjects(projects.filter(p => p.id !== projectId));
+        setDeleteProjectId(null);
+      } else {
+        setError('Failed to delete project');
+      }
+    } catch (error) {
+      setError('Error deleting project');
+      console.error('Delete project error:', error);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   const handleLogout = () => {
     logout();
     router.push('/login');
   };
 
-  // Mock projects data
-  const mockProjects = [
-    {
-      id: 'demo-project',
-      name: 'Climate Data Analysis',
-      description: 'Analyzing temperature and CO2 trends over the past 30 years',
-      createdAt: '2025-01-01',
-      status: 'active',
-    },
-    {
-      id: 'sample-project',
-      name: 'Customer Purchase Behavior',
-      description: 'Understanding customer demographics and buying patterns',
-      createdAt: '2024-12-15',
-      status: 'draft',
-    },
-  ];
-
-  // Show loading if not authenticated
   if (!isAuthenticated || !user) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -88,6 +146,8 @@ export default function DashboardPage() {
       </div>
     );
   }
+
+  const projectToDelete = projects.find(p => p.id === deleteProjectId);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -103,7 +163,7 @@ export default function DashboardPage() {
                 Welcome, {user.firstName}!
               </span>
               <Button variant="outline" size="sm" onClick={handleLogout}>
-                Sign Out
+                Logout
               </Button>
             </div>
           </div>
@@ -114,132 +174,169 @@ export default function DashboardPage() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Your Projects</h2>
-          <p className="text-gray-600">Create and manage your data journalism projects</p>
+          <p className="text-gray-600">
+            Create and manage your data journalism projects
+          </p>
         </div>
 
-        {/* Create New Project Button */}
+        {error && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-md">
+            <p className="text-red-600">{error}</p>
+          </div>
+        )}
+
+        {/* Create Project Button */}
         <div className="mb-6">
-          <Button className="flex items-center">
-            <Plus className="w-4 h-4 mr-2" />
-            Create New Project
+          <Button onClick={() => setShowCreateModal(true)} className="flex items-center space-x-2">
+            <Plus className="w-4 h-4" />
+            <span>Create New Project</span>
           </Button>
         </div>
 
         {/* Projects Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {/* Mock Project Cards */}
-          {mockProjects.map((project) => (
-            <Card key={project.id} className="hover:shadow-lg transition-shadow">
-              <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  <div className="flex items-center">
-                    <FileText className="w-5 h-5 mr-2" />
-                    {project.name}
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => router.push(`/project/${project.id}/notebook`)}
-                  >
-                    <BookOpen className="w-4 h-4" />
-                  </Button>
-                </CardTitle>
-                <CardDescription>
-                  {project.description}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <div className="flex items-center text-sm text-gray-500">
-                    <Calendar className="w-4 h-4 mr-1" />
-                    Created {new Date(project.createdAt).toLocaleDateString()}
-                  </div>
-                  
-                  <div className="flex items-center justify-between">
-                    <Badge 
-                      variant={project.status === 'active' ? 'default' : 'secondary'}
-                      className={project.status === 'active' ? 'bg-green-100 text-green-800' : ''}
+        {isLoading ? (
+          <div className="text-center py-8">
+            <p className="text-gray-600">Loading projects...</p>
+          </div>
+        ) : projects.length === 0 ? (
+          <div className="text-center py-12">
+            <FileText className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No projects yet</h3>
+            <p className="text-gray-600">
+              Get started by creating your first data journalism project.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {projects.map((project) => (
+              <Card key={project.id} className="hover:shadow-lg transition-shadow">
+                <CardHeader>
+                  <div className="flex items-start justify-between">
+                    <CardTitle 
+                      className="text-lg cursor-pointer hover:text-blue-600"
+                      onClick={() => router.push(`/project/${project.id}/notebook`)}
                     >
-                      {project.status === 'active' ? 'Active' : 'Draft'}
-                    </Badge>
-                    
-                    <div className="flex space-x-1">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => router.push(`/project/${project.id}/notebook`)}
-                      >
-                        Open Notebook
-                      </Button>
-                      <Button variant="ghost" size="sm">
-                        <Settings className="w-4 h-4" />
-                      </Button>
-                    </div>
+                      {project.name}
+                    </CardTitle>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setDeleteProjectId(project.id);
+                      }}
+                    >
+                      <Trash2 className="w-4 h-4 text-red-500" />
+                    </Button>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                  {project.description && (
+                    <p className="text-sm text-gray-600 mt-2">{project.description}</p>
+                  )}
+                </CardHeader>
+                <CardContent 
+                  className="cursor-pointer" 
+                  onClick={() => router.push(`/project/${project.id}/notebook`)}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center text-sm text-gray-600">
+                      <Calendar className="w-4 h-4 mr-2" />
+                      Created {new Date(project.created_at).toLocaleDateString()}
+                    </div>
+                    <Badge variant="secondary">Active</Badge>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+      </main>
 
-          {/* Quick Start Card */}
-          <Card className="border-dashed border-2 border-gray-300 hover:border-gray-400 transition-colors">
-            <CardContent className="flex flex-col items-center justify-center h-64 text-center">
-              <BookOpen className="w-12 h-12 text-gray-400 mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">Try the Demo</h3>
-              <p className="text-gray-500 mb-4">
-                Explore our computational notebook with sample data
-              </p>
-              <Button 
-                onClick={() => router.push('/project/demo-project/notebook')}
-                className="bg-blue-600 hover:bg-blue-700"
+      {/* Create Project Modal - FIXED: No black background */}
+      {showCreateModal && (
+        <div className="fixed inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-2xl p-6 w-full max-w-md mx-4">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Create New Project</h3>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Project Name *
+                </label>
+                <Input
+                  type="text"
+                  placeholder="Enter project name"
+                  value={newProjectName}
+                  onChange={(e) => setNewProjectName(e.target.value)}
+                  className="w-full"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Description (Optional)
+                </label>
+                <Input
+                  type="text"
+                  placeholder="Enter project description"
+                  value={newProjectDescription}
+                  onChange={(e) => setNewProjectDescription(e.target.value)}
+                  className="w-full"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end space-x-3 mt-6">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowCreateModal(false);
+                  setNewProjectName('');
+                  setNewProjectDescription('');
+                }}
+                disabled={isCreating}
               >
-                <BookOpen className="w-4 h-4 mr-2" />
-                Open Demo Notebook
+                Cancel
               </Button>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Feature Overview */}
-        <div className="mt-12 bg-white p-6 rounded-lg shadow">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">
-            Computational Notebook Features
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <div className="text-center">
-              <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center mx-auto mb-3">
-                📁
-              </div>
-              <h4 className="font-medium text-gray-900 mb-1">Dataset Upload</h4>
-              <p className="text-sm text-gray-600">Upload CSV/Excel files with AI-powered summaries</p>
-            </div>
-            
-            <div className="text-center">
-              <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mx-auto mb-3">
-                💡
-              </div>
-              <h4 className="font-medium text-gray-900 mb-1">Smart Hypotheses</h4>
-              <p className="text-sm text-gray-600">Write research hypotheses with auto-save</p>
-            </div>
-            
-            <div className="text-center">
-              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mx-auto mb-3">
-                🤖
-              </div>
-              <h4 className="font-medium text-gray-900 mb-1">AI Code Generation</h4>
-              <p className="text-sm text-gray-600">Natural language to Python code with Gemini AI</p>
-            </div>
-            
-            <div className="text-center">
-              <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center mx-auto mb-3">
-                📊
-              </div>
-              <h4 className="font-medium text-gray-900 mb-1">Tagged Insights</h4>
-              <p className="text-sm text-gray-600">Organize findings with custom color-coded tags</p>
+              <Button
+                onClick={createProject}
+                disabled={!newProjectName.trim() || isCreating}
+              >
+                {isCreating ? 'Creating...' : 'Create Project'}
+              </Button>
             </div>
           </div>
         </div>
-      </main>
+      )}
+
+      {/* Delete Confirmation Modal - FIXED: No black background */}
+      {deleteProjectId && projectToDelete && (
+        <div className="fixed inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-2xl p-6 w-full max-w-md mx-4">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Delete Project</h3>
+            
+            <p className="text-gray-600 mb-6">
+              Are you sure you want to delete "{projectToDelete.name}"? This action cannot be undone.
+            </p>
+
+            <div className="flex justify-end space-x-3">
+              <Button
+                variant="outline"
+                onClick={() => setDeleteProjectId(null)}
+                disabled={isDeleting}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => deleteProject(deleteProjectId)}
+                disabled={isDeleting}
+              >
+                {isDeleting ? 'Deleting...' : 'Delete'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

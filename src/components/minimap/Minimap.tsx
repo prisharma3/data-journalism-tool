@@ -1,141 +1,115 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { MinimapSection } from './MinimapSection';
-import { useProjectStore } from '@/stores/projectStore';
-import { MinimapSection as MinimapSectionType } from '@/types';
-import { COLORS } from '@/lib/constants';
 
 interface MinimapProps {
-  onSectionClick: (sectionId: string) => void;
-  currentSection?: string;
+  projectId: string;
 }
 
-export function Minimap({ onSectionClick, currentSection }: MinimapProps) {
-  const [sections, setSections] = useState<MinimapSectionType[]>([]);
-  const { 
-    datasets, 
-    hypotheses, 
-    analyses, 
-    insights,
-    currentProject 
-  } = useProjectStore();
+interface MinimapSection {
+  id: string;
+  type: 'dataset' | 'hypothesis' | 'analysis' | 'insight';
+  position: number;
+  height: number;
+  color?: string;
+  title: string;
+}
 
-  // Generate minimap sections based on project data
+export default function Minimap({ projectId }: MinimapProps) {
+  const [sections, setSections] = useState<MinimapSection[]>([]);
+  const [currentSection, setCurrentSection] = useState<string>('');
+
+  // Load sections from API or store
   useEffect(() => {
-    if (!currentProject) return;
+    // TODO: Fetch sections from API based on projectId
+    // fetchProjectSections(projectId);
+  }, [projectId]);
 
-    const newSections: MinimapSectionType[] = [];
+  const handleSectionClick = (sectionId: string) => {
+    setCurrentSection(sectionId);
+    // TODO: Scroll to section in notebook
+    console.log('Navigate to section:', sectionId);
+  };
 
-    // Dataset section (always present if project exists)
-    newSections.push({
-      id: 'dataset-section',
-      type: 'dataset',
-      title: datasets.length > 0 ? `Dataset: ${datasets[0].fileName}` : 'Upload Dataset',
-      color: COLORS.DATASET,
-      position: 0,
-      isActive: currentSection === 'dataset-section',
-    });
-
-    // Hypothesis sections
-    hypotheses.forEach((hypothesis, index) => {
-      newSections.push({
-        id: `hypothesis-${hypothesis.id}`,
-        type: 'hypothesis',
-        title: `H${index + 1}: ${hypothesis.content.substring(0, 30)}...`,
-        color: COLORS.HYPOTHESIS,
-        position: newSections.length,
-        isActive: currentSection === `hypothesis-${hypothesis.id}`,
-      });
-
-      // Analysis sections for this hypothesis
-      const hypothesisAnalyses = analyses.filter(a => a.hypothesisId === hypothesis.id);
-      hypothesisAnalyses.forEach((analysis, analysisIndex) => {
-        newSections.push({
-          id: `analysis-${analysis.id}`,
-          type: 'analysis',
-          title: `A${index + 1}.${analysisIndex + 1}: ${analysis.query.substring(0, 25)}...`,
-          color: COLORS.ANALYSIS,
-          position: newSections.length,
-          isActive: currentSection === `analysis-${analysis.id}`,
-        });
-
-        // Output section for this analysis
-        newSections.push({
-          id: `output-${analysis.id}`,
-          type: 'output',
-          title: `Output ${index + 1}.${analysisIndex + 1}`,
-          color: COLORS.OUTPUT,
-          position: newSections.length,
-          isActive: currentSection === `output-${analysis.id}`,
-        });
-      });
-    });
-
-    // Insights section (if any insights exist)
-    if (insights.length > 0) {
-      newSections.push({
-        id: 'insights-section',
-        type: 'insight',
-        title: `Insights (${insights.length})`,
-        color: COLORS.INSIGHT,
-        position: newSections.length,
-        isActive: currentSection === 'insights-section',
-      });
+  const getSectionTypeLabel = (type: string) => {
+    switch (type) {
+      case 'dataset': return 'Dataset';
+      case 'hypothesis': return 'Hypothesis';
+      case 'analysis': return 'Analysis';
+      case 'insight': return 'Insight';
+      default: return type;
     }
-
-    setSections(newSections);
-  }, [datasets, hypotheses, analyses, insights, currentProject, currentSection]);
-
-  if (!currentProject) {
-    return (
-      <div className="w-64 bg-white border-r border-gray-200 p-4">
-        <div className="text-sm text-gray-500 text-center">
-          No project selected
-        </div>
-      </div>
-    );
-  }
+  };
 
   return (
-    <motion.div
-      className="w-64 bg-white border-r border-gray-200 p-4 overflow-y-auto"
-      initial={{ x: -100, opacity: 0 }}
-      animate={{ x: 0, opacity: 1 }}
-      transition={{ duration: 0.3 }}
-    >
-      <div className="mb-4">
-        <h3 className="text-sm font-medium text-gray-900 mb-2">Project Navigation</h3>
-        <div className="text-xs text-gray-500">
-          {currentProject.name}
-        </div>
+    <div className="h-full flex flex-col">
+      {/* Minimap Header */}
+      <div className="p-4 border-b border-gray-200">
+        <h3 className="text-sm font-medium text-gray-900">Project Overview</h3>
+        <p className="text-xs text-gray-500 mt-1">Click to navigate</p>
       </div>
 
-      <div className="space-y-2">
-        {sections.map((section, index) => (
-          <motion.div
-            key={section.id}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.05 }}
-          >
-            <MinimapSection
-              section={section}
-              onClick={() => onSectionClick(section.id)}
-              isActive={section.isActive}
+      {/* Minimap Content */}
+      <div className="flex-1 p-4">
+        {/* Visual minimap representation */}
+        <div className="relative h-96 bg-gray-50 rounded-lg border border-gray-200 mb-4">
+          {sections.map((section) => (
+            <div
+              key={section.id}
+              className={`absolute left-2 right-2 cursor-pointer rounded transition-all hover:opacity-80 ${
+                currentSection === section.id ? 'ring-2 ring-blue-500' : ''
+              }`}
+              style={{
+                top: `${(section.position / 500) * 100}%`,
+                height: `${(section.height / 500) * 100}%`,
+                backgroundColor: section.color
+              }}
+              onClick={() => handleSectionClick(section.id)}
+              title={`${getSectionTypeLabel(section.type)}: ${section.title}`}
             />
-          </motion.div>
-        ))}
-      </div>
-
-      {sections.length === 1 && (
-        <div className="mt-6 p-3 bg-gray-50 rounded-lg text-center">
-          <div className="text-xs text-gray-500">
-            Start by uploading a dataset, then add hypotheses and analyses
-          </div>
+          ))}
+          
+          {/* Empty state */}
+          {sections.length === 0 && (
+            <div className="absolute inset-0 flex items-center justify-center text-gray-400 text-sm">
+              No sections yet
+            </div>
+          )}
         </div>
-      )}
-    </motion.div>
+
+        {/* Section List */}
+        <div className="space-y-2">
+          <h4 className="text-xs font-medium text-gray-700 uppercase tracking-wide">
+            Sections
+          </h4>
+          {sections.length === 0 ? (
+            <p className="text-xs text-gray-500">Start adding cells to see sections</p>
+          ) : (
+            sections.map((section) => (
+              <button
+                key={section.id}
+                className={`w-full text-left p-2 rounded-md text-sm transition-colors ${
+                  currentSection === section.id
+                    ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                    : 'hover:bg-gray-50 text-gray-700'
+                }`}
+                onClick={() => handleSectionClick(section.id)}
+              >
+                <div className="flex items-center space-x-2">
+                  <div
+                    className="w-3 h-3 rounded-sm"
+                    style={{ backgroundColor: section.color }}
+                  />
+                  <div>
+                    <div className="font-medium">{getSectionTypeLabel(section.type)}</div>
+                    <div className="text-xs text-gray-500 truncate">{section.title}</div>
+                  </div>
+                </div>
+              </button>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
