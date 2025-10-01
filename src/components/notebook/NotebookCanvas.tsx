@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/button';
 import CodeCell from './CodeCell';
 import DatasetSection from './DatasetSection';
 import HypothesisSection from './HypothesisSection';
+import InsightCard from './InsightCard';
+import AddInsightModal from './AddInsightModal';
 
 interface NotebookCanvasProps {
   projectId: string;
@@ -31,19 +33,21 @@ interface NotebookState {
 
 
 
-interface CodeCellType {
-  id: string;
-  type: 'code';
-  content: string;
-  output?: {
-    text?: string;
-    plot?: string;
-    executionTime?: number;
-  };
-  error?: string;
-  executionCount?: number;
-  isRunning?: boolean;
-}
+  interface CodeCellType {
+    id: string;
+    type: 'code';
+    content: string;
+    query?: string; // Natural language query
+    output?: {
+      text?: string;
+      plot?: string;
+      executionTime?: number;
+    };
+    error?: string;
+    executionCount?: number;
+    isRunning?: boolean;
+    isGenerating?: boolean;
+  }
 
 interface Hypothesis {
     id: string;
@@ -51,12 +55,39 @@ interface Hypothesis {
     createdAt: Date;
   }
 
-interface NotebookState {
-  cells: CodeCellType[];
-  selectedCellId?: string;
-  isExecutingAll: boolean;
-  executionCounter: number;
-}
+  interface Tag {
+    id: string;
+    name: string;
+    color: string;
+  }
+  
+  interface Insight {
+    id: string;
+    cellId: string; // Which code cell this insight is attached to
+    content: string;
+    tagId: string;
+    createdAt: Date;
+  }
+
+  interface NotebookState {
+    cells: CodeCellType[];
+    selectedCellId?: string;
+    isExecutingAll: boolean;
+    executionCounter: number;
+    dataset: {
+      filename: string;
+      data: string;
+      summary?: {
+        rows: number;
+        columns: number;
+        columnNames: string[];
+        columnTypes: Record<string, string>;
+      };
+    } | null;
+    hypotheses: Hypothesis[];
+    insights: Insight[];
+    tags: Tag[];
+  }
 
 export default function NotebookCanvas({ projectId }: NotebookCanvasProps) {
     const [notebookState, setNotebookState] = useState<NotebookState>({
@@ -66,6 +97,21 @@ export default function NotebookCanvas({ projectId }: NotebookCanvasProps) {
         executionCounter: 0,
         dataset: null,
         hypotheses: [],
+        insights: [],
+        tags: [
+          { id: 'tag-1', name: 'For Review', color: '#9C27B0' },
+          { id: 'tag-2', name: 'Explanation', color: '#4CAF50' },
+          { id: 'tag-3', name: 'For Teacher', color: '#F44336' },
+          { id: 'tag-4', name: 'Key Finding', color: '#2196F3' },
+        ],
+      });
+
+      const [insightModal, setInsightModal] = useState<{
+        isOpen: boolean;
+        cellId: string | null;
+      }>({
+        isOpen: false,
+        cellId: null,
       });
 
   // Load cells from API or store
@@ -342,81 +388,264 @@ const handleHypothesesChange = useCallback((hypotheses: Hypothesis[]) => {
     }));
   }, []);
 
+  // Handle AI code generation
+// Handle AI code generation
+const handleGenerateCode = useCallback(async (cellId: string, query: string) => {
+    // Mark cell as generating
+    setNotebookState(prev => ({
+      ...prev,
+      cells: prev.cells.map(c =>
+        c.id === cellId ? { ...c, isGenerating: true, query } : c
+      ),
+    }));
+  
+    try {
+      const response = await fetch('/api/generate-code', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          query,
+          datasetInfo: notebookState.dataset?.summary,
+        }),
+      });
+  
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to generate code');
+      }
+  
+      const data = await response.json();
+  
+      // Update cell with generated code
+      setNotebookState(prev => ({
+        ...prev,
+        cells: prev.cells.map(c =>
+          c.id === cellId
+            ? {
+                ...c,
+                content: data.code,
+                query,
+                isGenerating: false,
+              }
+            : c
+        ),
+      }));
+    } catch (error: any) {
+      console.error('Code generation error:', error);
+      // Update cell with error
+      setNotebookState(prev => ({
+        ...prev,
+        cells: prev.cells.map(c =>
+          c.id === cellId
+            ? {
+                ...c,
+                isGenerating: false,
+                error: error.message || 'Failed to generate code',
+              }
+            : c
+        ),
+      }));
+    }
+  }, [notebookState.dataset]);
+
+  // Handle adding insight
+const handleAddInsight = useCallback((cellId: string, content: string, tagId: string) => {
+    const newInsight: Insight = {
+      id: `insight-${Date.now()}`,
+      cellId,
+      content,
+      tagId,
+      createdAt: new Date(),
+    };
+  
+    setNotebookState(prev => ({
+      ...prev,
+      insights: [...prev.insights, newInsight],
+    }));
+  }, []);
+  
+  // Handle deleting insight
+  const handleDeleteInsight = useCallback((insightId: string) => {
+    setNotebookState(prev => ({
+      ...prev,
+      insights: prev.insights.filter(i => i.id !== insightId),
+    }));
+  }, []);
+  
+  // Handle updating insight
+  const handleUpdateInsight = useCallback((insightId: string, content: string, tagId: string) => {
+    setNotebookState(prev => ({
+      ...prev,
+      insights: prev.insights.map(i =>
+        i.id === insightId ? { ...i, content, tagId } : i
+      ),
+    }));
+  }, []);
+  
+  // Handle adding new tag
+  const handleAddTag = useCallback((name: string, color: string) => {
+    const newTag: Tag = {
+      id: `tag-${Date.now()}`,
+      name,
+      color,
+    };
+  
+    setNotebookState(prev => ({
+      ...prev,
+      tags: [...prev.tags, newTag],
+    }));
+  
+    return newTag.id;
+  }, []);
+
+  // Handle opening insight modal
+const handleOpenInsightModal = useCallback((cellId: string) => {
+    setInsightModal({ isOpen: true, cellId });
+  }, []);
+  
+  // Handle closing insight modal
+  const handleCloseInsightModal = useCallback(() => {
+    setInsightModal({ isOpen: false, cellId: null });
+  }, []);
+  
+  // Handle saving insight from modal
+  const handleSaveInsight = useCallback((content: string, tagId: string) => {
+    if (insightModal.cellId) {
+      handleAddInsight(insightModal.cellId, content, tagId);
+      handleCloseInsightModal();
+    }
+  }, [insightModal.cellId, handleAddInsight, handleCloseInsightModal]);
+
   return (
-    <div className="h-full flex flex-col bg-gray-50">
-      {/* Notebook Toolbar */}
-      <div className="flex items-center gap-2 p-2 bg-white border-b border-gray-200">
-        <Button
-          onClick={executeAllCells}
-          disabled={notebookState.isExecutingAll}
-          size="sm"
-          className="flex items-center gap-1"
-        >
-          <Play size={16} />
-          Run All
-        </Button>
+<div className="h-full flex flex-col bg-gray-50">
+{/* Notebook Toolbar */}
+<div className="flex items-center gap-2 p-2 bg-white border-b border-gray-200">
+  <Button
+    onClick={executeAllCells}
+    disabled={notebookState.isExecutingAll}
+    size="sm"
+    className="flex items-center gap-1"
+  >
+    <Play size={16} />
+    Run All
+  </Button>
 
-        <Button
-          onClick={clearAllOutputs}
-          size="sm"
-          variant="outline"
-          className="flex items-center gap-1"
-        >
-          <RotateCcw size={16} />
-          Clear Outputs
-        </Button>
+  <Button
+    onClick={clearAllOutputs}
+    size="sm"
+    variant="outline"
+    className="flex items-center gap-1"
+  >
+    <RotateCcw size={16} />
+    Clear Outputs
+  </Button>
 
-        <Button
-          onClick={() => addCell()}
-          size="sm"
-          variant="outline"
-          className="flex items-center gap-1"
-        >
-          <Plus size={16} />
-          Add Cell
-        </Button>
+  <Button
+    onClick={() => addCell()}
+    size="sm"
+    variant="outline"
+    className="flex items-center gap-1"
+  >
+    <Plus size={16} />
+    Add Cell
+  </Button>
+</div>
+
+{/* Two Column Layout: Notebook + Insights */}
+<div className="flex-1 flex overflow-hidden">
+  {/* Left Column: Notebook Content */}
+  <div className="flex-1 overflow-y-auto p-4" style={{ maxWidth: '70%' }}>
+    {/* Dataset Upload Section */}
+    <DatasetSection
+      dataset={notebookState.dataset}
+      onDatasetUpload={handleDatasetUpload}
+      onDatasetRemove={handleDatasetRemove}
+    />
+
+    {/* Hypothesis Section */}
+    <HypothesisSection
+      hypotheses={notebookState.hypotheses}
+      onHypothesesChange={handleHypothesesChange}
+    />
+
+    {notebookState.cells.length === 0 ? (
+      <div className="text-center py-20 text-gray-500">
+        <Plus size={48} className="mx-auto mb-4 opacity-30" />
+        <p>No cells yet. Click "Add Cell" to start coding!</p>
+      </div>
+    ) : (
+        notebookState.cells.map((cell, index) => (
+            <CodeCell
+              key={`${cell.id}-${index}`}
+              cell={cell}
+              isSelected={notebookState.selectedCellId === cell.id}
+              onExecute={executeCell}
+              onDelete={deleteCell}
+              onUpdate={updateCell}
+              onSelect={selectCell}
+              onAddAbove={(id) => addCell(id, 'above')}
+              onAddBelow={(id) => addCell(id, 'below')}
+              onMoveUp={(id) => moveCell(id, 'up')}
+              onMoveDown={(id) => moveCell(id, 'down')}
+              onGenerateCode={handleGenerateCode}
+              onAddInsight={handleOpenInsightModal}
+              canMoveUp={index > 0}
+              canMoveDown={index < notebookState.cells.length - 1}
+              datasetInfo={notebookState.dataset?.summary}
+            />
+          ))
+    )}
+  </div>
+
+      {/* Right Column: Insights Margin */}
+      <div 
+        className="w-[30%] bg-gray-100 border-l border-gray-300 overflow-y-auto p-4"
+        style={{ minWidth: '300px', maxWidth: '400px' }}
+      >
+        <div className="sticky top-0 mb-4 pb-2 bg-gray-100 z-10 border-b border-gray-300">
+          <h3 className="text-sm font-semibold text-gray-700">Insights</h3>
+          <p className="text-xs text-gray-500 mt-1">
+            {notebookState.insights.length} insight{notebookState.insights.length !== 1 ? 's' : ''}
+          </p>
+        </div>
+
+        {/* Insights List */}
+        <div className="space-y-3">
+          {notebookState.insights.length === 0 ? (
+            <p className="text-sm text-gray-500 text-center py-8">
+              No insights yet. Run code and click "+ Add Insight" to create insights.
+            </p>
+          ) : (
+            notebookState.insights.map(insight => {
+              const tag = notebookState.tags.find(t => t.id === insight.tagId);
+              if (!tag) return null;
+              
+              return (
+                <InsightCard
+                  key={insight.id}
+                  insight={insight}
+                  tag={tag}
+                  onUpdate={handleUpdateInsight}
+                  onDelete={handleDeleteInsight}
+                  allTags={notebookState.tags}
+                />
+              );
+            })
+          )}
+        </div>
       </div>
 
-{/* Cells Container */}
-<div className="flex-1 overflow-y-auto p-4">
-  {/* Dataset Upload Section */}
-  <DatasetSection
-    dataset={notebookState.dataset}
-    onDatasetUpload={handleDatasetUpload}
-    onDatasetRemove={handleDatasetRemove}
-  />
-
-  {/* Hypothesis Section */}
-  <HypothesisSection
-    hypotheses={notebookState.hypotheses}
-    onHypothesesChange={handleHypothesesChange}
-  />
-
-  {notebookState.cells.length === 0 ? (
-    <div className="text-center py-20 text-gray-500">
-      <Plus size={48} className="mx-auto mb-4 opacity-30" />
-      <p>No cells yet. Click "Add Cell" to start coding!</p>
-    </div>
-  ) : (
-    notebookState.cells.map((cell, index) => (
-      <CodeCell
-        key={`${cell.id}-${index}`}
-        cell={cell}
-        isSelected={notebookState.selectedCellId === cell.id}
-        onExecute={executeCell}
-        onDelete={deleteCell}
-        onUpdate={updateCell}
-        onSelect={selectCell}
-        onAddAbove={(id) => addCell(id, 'above')}
-        onAddBelow={(id) => addCell(id, 'below')}
-        onMoveUp={(id) => moveCell(id, 'up')}
-        onMoveDown={(id) => moveCell(id, 'down')}
-        canMoveUp={index > 0}
-        canMoveDown={index < notebookState.cells.length - 1}
+            {/* Add Insight Modal */}
+            <AddInsightModal
+        isOpen={insightModal.isOpen}
+        onClose={handleCloseInsightModal}
+        onSave={handleSaveInsight}
+        tags={notebookState.tags}
+        onAddTag={handleAddTag}
       />
-    ))
-  )}
 </div>
-    </div>
-  );
+</div>
+);
 }

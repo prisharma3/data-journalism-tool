@@ -1,0 +1,146 @@
+'use client';
+
+import { useState } from 'react';
+import { Edit2, Trash2, Save, X } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+
+interface Tag {
+  id: string;
+  name: string;
+  color: string;
+}
+
+interface InsightCardProps {
+  insight: {
+    id: string;
+    cellId: string;
+    content: string;
+    tagId: string;
+    createdAt: Date;
+  };
+  tag: Tag;
+  onUpdate: (insightId: string, content: string, tagId: string) => void;
+  onDelete: (insightId: string) => void;
+  allTags: Tag[];
+}
+
+export default function InsightCard({
+  insight,
+  tag,
+  onUpdate,
+  onDelete,
+  allTags,
+}: InsightCardProps) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editContent, setEditContent] = useState(insight.content);
+  const [editTagId, setEditTagId] = useState(insight.tagId);
+
+  const handleSave = () => {
+    if (editContent.trim()) {
+      onUpdate(insight.id, editContent.trim(), editTagId);
+      setIsEditing(false);
+    }
+  };
+
+  const handleCancel = () => {
+    setEditContent(insight.content);
+    setEditTagId(insight.tagId);
+    setIsEditing(false);
+  };
+
+  return (
+    <div
+      className="rounded-lg border-2 p-3 shadow-sm transition-all hover:shadow-md"
+      style={{
+        borderColor: tag.color,
+        backgroundColor: `${tag.color}15`, // 15 is hex for ~8% opacity
+      }}
+    >
+      {/* Tag Header */}
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2">
+          <div
+            className="w-2 h-2 rounded-full"
+            style={{ backgroundColor: tag.color }}
+          />
+          {isEditing ? (
+            <select
+              value={editTagId}
+              onChange={(e) => setEditTagId(e.target.value)}
+              className="text-xs font-semibold px-2 py-1 rounded border border-gray-300 focus:outline-none focus:ring-2"
+              style={{ color: tag.color }}
+            >
+              {allTags.map(t => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <span className="text-xs font-semibold" style={{ color: tag.color }}>
+              {tag.name}
+            </span>
+          )}
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex gap-1">
+          {isEditing ? (
+            <>
+              <button
+                onClick={handleSave}
+                className="p-1 hover:bg-white/50 rounded"
+                title="Save"
+              >
+                <Save size={12} style={{ color: tag.color }} />
+              </button>
+              <button
+                onClick={handleCancel}
+                className="p-1 hover:bg-white/50 rounded"
+                title="Cancel"
+              >
+                <X size={12} className="text-gray-600" />
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                onClick={() => setIsEditing(true)}
+                className="p-1 hover:bg-white/50 rounded"
+                title="Edit"
+              >
+                <Edit2 size={12} className="text-gray-600" />
+              </button>
+              <button
+                onClick={() => {
+                  if (window.confirm('Delete this insight?')) {
+                    onDelete(insight.id);
+                  }
+                }}
+                className="p-1 hover:bg-white/50 rounded"
+                title="Delete"
+              >
+                <Trash2 size={12} className="text-red-600" />
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Content */}
+      {isEditing ? (
+        <textarea
+          value={editContent}
+          onChange={(e) => setEditContent(e.target.value)}
+          className="w-full p-2 text-sm rounded border border-gray-300 focus:outline-none focus:ring-2 resize-none bg-white"
+          rows={3}
+          autoFocus
+        />
+      ) : (
+        <p className="text-sm text-gray-800 whitespace-pre-wrap">
+          {insight.content}
+        </p>
+      )}
+    </div>
+  );
+}

@@ -2,34 +2,39 @@
 
 import { useState, useRef } from 'react';
 import Editor from '@monaco-editor/react';
-import { Play, Trash2, Plus, ChevronUp, ChevronDown, Check, X, Loader } from 'lucide-react';
+import { Play, Trash2, Plus, ChevronUp, ChevronDown, Check, X, Loader, Sparkles, Edit2 } from 'lucide-react';
 
 interface CodeCellProps {
-  cell: {
-    id: string;
-    type: 'code';
-    content: string;
-    output?: {
-      text?: string;
-      plot?: string;
-      executionTime?: number;
+    cell: {
+      id: string;
+      type: 'code';
+      content: string;
+      query?: string;
+      output?: {
+        text?: string;
+        plot?: string;
+        executionTime?: number;
+      };
+      error?: string;
+      executionCount?: number;
+      isRunning?: boolean;
+      isGenerating?: boolean;
     };
-    error?: string;
-    executionCount?: number;
-    isRunning?: boolean;
-  };
-  isSelected: boolean;
-  onExecute: (id: string) => void;
-  onDelete: (id: string) => void;
-  onUpdate: (id: string, content: string) => void;
-  onSelect: (id: string) => void;
-  onAddBelow: (id: string) => void;
-  onAddAbove: (id: string) => void;
-  onMoveUp?: (id: string) => void;
-  onMoveDown?: (id: string) => void;
-  canMoveUp: boolean;
-  canMoveDown: boolean;
-}
+    isSelected: boolean;
+    onExecute: (id: string) => void;
+    onDelete: (id: string) => void;
+    onUpdate: (id: string, content: string) => void;
+    onSelect: (id: string) => void;
+    onAddBelow: (id: string) => void;
+    onAddAbove: (id: string) => void;
+    onMoveUp?: (id: string) => void;
+    onMoveDown?: (id: string) => void;
+    onGenerateCode?: (id: string, query: string) => void;
+    onAddInsight?: (cellId: string) => void; // NEW
+    canMoveUp: boolean;
+    canMoveDown: boolean;
+    datasetInfo?: any;
+  }
 
 export default function CodeCell({
   cell,
@@ -42,10 +47,15 @@ export default function CodeCell({
   onAddAbove,
   onMoveUp,
   onMoveDown,
+  onGenerateCode,
+  onAddInsight, // NEW
   canMoveUp,
-  canMoveDown
+  canMoveDown,
+  datasetInfo,
 }: CodeCellProps) {
   const [isHovered, setIsHovered] = useState(false);
+  const [showQueryInput, setShowQueryInput] = useState(!cell.content && !cell.query);
+  const [queryText, setQueryText] = useState(cell.query || '');
   const editorRef = useRef<any>(null);
 
   const handleEditorDidMount = (editor: any) => {
@@ -60,6 +70,25 @@ export default function CodeCell({
       e.preventDefault();
       onExecute(cell.id);
     }
+  };
+
+  const handleQueryKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleGenerateCode();
+    }
+  };
+
+  const handleGenerateCode = () => {
+    if (queryText.trim() && onGenerateCode) {
+      onGenerateCode(cell.id, queryText.trim());
+      setShowQueryInput(false);
+    }
+  };
+
+  const handleEditQuery = () => {
+    setShowQueryInput(true);
+    setQueryText(cell.query || '');
   };
 
   return (
@@ -88,6 +117,7 @@ export default function CodeCell({
 
           {/* Execution Status */}
           {cell.isRunning && <Loader size={14} className="animate-spin text-blue-500" />}
+          {cell.isGenerating && <Loader size={14} className="animate-spin text-purple-500" />}
           {cell.output && !cell.isRunning && !cell.error && <Check size={14} className="text-green-500" />}
           {cell.error && <X size={14} className="text-red-500" />}
         </div>
@@ -101,9 +131,24 @@ export default function CodeCell({
             }}
             title="Run Cell (Shift+Enter)"
             className="px-2 py-1 bg-green-500 text-white rounded text-xs hover:bg-green-600 flex items-center"
+            disabled={cell.isRunning || cell.isGenerating}
           >
             <Play size={12} />
           </button>
+
+          {cell.query && !showQueryInput && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleEditQuery();
+              }}
+              title="Edit Query"
+              className="px-2 py-1 bg-purple-500 text-white rounded text-xs hover:bg-purple-600 flex items-center"
+              disabled={cell.isGenerating}
+            >
+              <Edit2 size={12} />
+            </button>
+          )}
 
           <button
             onClick={(e) => {
@@ -168,27 +213,91 @@ export default function CodeCell({
         </div>
       </div>
 
+      {/* Query Input (shown when cell is new or editing query) */}
+      {showQueryInput && (
+        <div className="p-3 bg-blue-50 border-b border-blue-200">
+          <div className="flex items-start gap-2">
+            <Sparkles size={16} className="text-blue-600 mt-2 flex-shrink-0" />
+            <div className="flex-1">
+              <textarea
+                value={queryText}
+                onChange={(e) => setQueryText(e.target.value)}
+                onKeyDown={handleQueryKeyDown}
+                placeholder="Describe what you want to analyze... (e.g., 'Show distribution of sepal length')"
+                className="w-full p-2 rounded border border-blue-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none resize-none bg-white text-gray-900 text-sm"
+                rows={2}
+                disabled={cell.isGenerating}
+                autoFocus
+              />
+              <div className="flex items-center justify-between mt-2">
+                <p className="text-xs text-blue-700">
+                  Press <kbd className="px-1.5 py-0.5 bg-white rounded border border-blue-300">Enter</kbd> to generate code
+                </p>
+                <div className="flex gap-2">
+                  {cell.content && (
+                    <button
+                      onClick={() => setShowQueryInput(false)}
+                      className="text-xs text-gray-600 hover:text-gray-800"
+                      disabled={cell.isGenerating}
+                    >
+                      Cancel
+                    </button>
+                  )}
+                  <button
+                    onClick={handleGenerateCode}
+                    disabled={!queryText.trim() || cell.isGenerating}
+                    className="px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                  >
+                    {cell.isGenerating ? (
+                      <>
+                        <Loader size={12} className="animate-spin" />
+                        Generating...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles size={12} />
+                        Generate
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Display Query (when code is generated) */}
+      {cell.query && !showQueryInput && (
+        <div className="px-3 py-2 bg-purple-50 border-b border-purple-200 flex items-start gap-2">
+          <Sparkles size={14} className="text-purple-600 mt-0.5 flex-shrink-0" />
+          <p className="text-sm text-purple-900 flex-1 italic">"{cell.query}"</p>
+        </div>
+      )}
+
       {/* Code Editor */}
-      <div onKeyDown={handleKeyDown}>
-        <Editor
-          height="120px"
-          defaultLanguage="python"
-          value={cell.content}
-          onChange={(value) => onUpdate(cell.id, value || '')}
-          onMount={handleEditorDidMount}
-          theme="vs-light"
-          options={{
-            minimap: { enabled: false },
-            fontSize: 12,
-            lineNumbers: 'on',
-            scrollBeyondLastLine: false,
-            automaticLayout: true,
-            tabSize: 4,
-            wordWrap: 'on',
-            padding: { top: 8, bottom: 8 },
-          }}
-        />
-      </div>
+      {cell.content && (
+        <div onKeyDown={handleKeyDown}>
+          <Editor
+            height="120px"
+            defaultLanguage="python"
+            value={cell.content}
+            onChange={(value) => onUpdate(cell.id, value || '')}
+            onMount={handleEditorDidMount}
+            theme="vs-light"
+            options={{
+              minimap: { enabled: false },
+              fontSize: 12,
+              lineNumbers: 'on',
+              scrollBeyondLastLine: false,
+              automaticLayout: true,
+              tabSize: 4,
+              wordWrap: 'on',
+              padding: { top: 8, bottom: 8 },
+            }}
+          />
+        </div>
+      )}
 
       {/* Output Display */}
       {(cell.output || cell.error) && (
@@ -197,7 +306,23 @@ export default function CodeCell({
           style={{
             backgroundColor: cell.error ? '#ffebee' : '#fafafa',
           }}
-        >
+          >
+          {/* Add Insight Button - Top Right */}
+          {cell.output && !cell.error && onAddInsight && (
+            <div className="flex justify-end mb-2">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onAddInsight(cell.id);
+                }}
+                className="flex items-center gap-1 px-3 py-1.5 bg-blue-500 text-white rounded text-xs hover:bg-blue-600 transition-colors shadow-sm"
+                title="Add Insight"
+              >
+                <Plus size={14} />
+                Add Insight
+              </button>
+            </div>
+          )}
           {cell.error && (
             <div className="text-red-700 font-mono text-xs">
               <strong>Error:</strong>
