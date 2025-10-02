@@ -21,6 +21,7 @@ interface NotebookState {
     dataset: {
       filename: string;
       data: string;
+      hypothesisTags?: string[]; // Array of hypothesis IDs
       summary?: {
         rows: number;
         columns: number;
@@ -66,6 +67,7 @@ interface Hypothesis {
     cellId: string; // Which code cell this insight is attached to
     content: string;
     tagId: string;
+    hypothesisTags?: string[]; // Array of hypothesis IDs
     createdAt: Date;
   }
 
@@ -77,6 +79,7 @@ interface Hypothesis {
     dataset: {
       filename: string;
       data: string;
+      hypothesisTags?: string[]; // Array of hypothesis IDs
       summary?: {
         rows: number;
         columns: number;
@@ -450,13 +453,24 @@ const handleGenerateCode = useCallback(async (cellId: string, query: string) => 
     }
   }, [notebookState.dataset]);
 
-  // Handle adding insight
-const handleAddInsight = useCallback((cellId: string, content: string, tagId: string) => {
+  // Handle updating hypothesis tags for a cell
+const handleUpdateCellHypothesisTags = useCallback((cellId: string, tags: string[]) => {
+    setNotebookState(prev => ({
+      ...prev,
+      cells: prev.cells.map(c =>
+        c.id === cellId ? { ...c, hypothesisTags: tags } : c
+      ),
+    }));
+  }, []);
+
+// Handle adding insight
+const handleAddInsight = useCallback((cellId: string, content: string, tagId: string, hypothesisTags?: string[]) => {
     const newInsight: Insight = {
       id: `insight-${Date.now()}`,
       cellId,
       content,
       tagId,
+      hypothesisTags: hypothesisTags || [],
       createdAt: new Date(),
     };
   
@@ -474,12 +488,12 @@ const handleAddInsight = useCallback((cellId: string, content: string, tagId: st
     }));
   }, []);
   
-  // Handle updating insight
-  const handleUpdateInsight = useCallback((insightId: string, content: string, tagId: string) => {
+// Handle updating insight
+const handleUpdateInsight = useCallback((insightId: string, content: string, tagId: string, hypothesisTags?: string[]) => {
     setNotebookState(prev => ({
       ...prev,
       insights: prev.insights.map(i =>
-        i.id === insightId ? { ...i, content, tagId } : i
+        i.id === insightId ? { ...i, content, tagId, hypothesisTags: hypothesisTags || [] } : i
       ),
     }));
   }, []);
@@ -509,14 +523,28 @@ const handleOpenInsightModal = useCallback((cellId: string) => {
   const handleCloseInsightModal = useCallback(() => {
     setInsightModal({ isOpen: false, cellId: null });
   }, []);
-  
-  // Handle saving insight from modal
-  const handleSaveInsight = useCallback((content: string, tagId: string) => {
+
+// Handle saving insight from modal
+const handleSaveInsight = useCallback((content: string, tagId: string, hypothesisTags: string[]) => {
     if (insightModal.cellId) {
-      handleAddInsight(insightModal.cellId, content, tagId);
+      // Create insight with hypothesis tags
+      const newInsight: Insight = {
+        id: `insight-${Date.now()}`,
+        cellId: insightModal.cellId,
+        content,
+        tagId,
+        hypothesisTags,
+        createdAt: new Date(),
+      };
+    
+      setNotebookState(prev => ({
+        ...prev,
+        insights: [...prev.insights, newInsight],
+      }));
+      
       handleCloseInsightModal();
     }
-  }, [insightModal.cellId, handleAddInsight, handleCloseInsightModal]);
+  }, [insightModal.cellId, handleCloseInsightModal]);
 
   return (
 <div className="h-full flex flex-col bg-gray-50">
@@ -591,6 +619,8 @@ const handleOpenInsightModal = useCallback((cellId: string) => {
               onMoveDown={(id) => moveCell(id, 'down')}
               onGenerateCode={handleGenerateCode}
               onAddInsight={handleOpenInsightModal}
+              onUpdateHypothesisTags={handleUpdateCellHypothesisTags}
+              hypotheses={notebookState.hypotheses}
               canMoveUp={index > 0}
               canMoveDown={index < notebookState.cells.length - 1}
               datasetInfo={notebookState.dataset?.summary}
@@ -613,38 +643,40 @@ const handleOpenInsightModal = useCallback((cellId: string) => {
 
         {/* Insights List */}
         <div className="space-y-3">
-          {notebookState.insights.length === 0 ? (
-            <p className="text-sm text-gray-500 text-center py-8">
-              No insights yet. Run code and click "+ Add Insight" to create insights.
-            </p>
-          ) : (
-            notebookState.insights.map(insight => {
-              const tag = notebookState.tags.find(t => t.id === insight.tagId);
-              if (!tag) return null;
-              
-              return (
-                <InsightCard
-                  key={insight.id}
-                  insight={insight}
-                  tag={tag}
-                  onUpdate={handleUpdateInsight}
-                  onDelete={handleDeleteInsight}
-                  allTags={notebookState.tags}
-                />
-              );
-            })
-          )}
+        {notebookState.insights.length === 0 ? (
+  <p className="text-sm text-gray-500 text-center py-8">
+    No insights yet. Run code and click "+ Add Insight" to create insights.
+  </p>
+) : (
+  notebookState.insights.map(insight => {
+    const tag = notebookState.tags.find(t => t.id === insight.tagId);
+    if (!tag) return null;
+    
+    return (
+      <InsightCard
+        key={insight.id}
+        insight={insight}
+        tag={tag}
+        onUpdate={handleUpdateInsight}
+        onDelete={handleDeleteInsight}
+        allTags={notebookState.tags}
+        hypotheses={notebookState.hypotheses}
+      />
+    );
+  })
+)}
         </div>
       </div>
 
-            {/* Add Insight Modal */}
-            <AddInsightModal
-        isOpen={insightModal.isOpen}
-        onClose={handleCloseInsightModal}
-        onSave={handleSaveInsight}
-        tags={notebookState.tags}
-        onAddTag={handleAddTag}
-      />
+{/* Add Insight Modal */}
+<AddInsightModal
+  isOpen={insightModal.isOpen}
+  onClose={handleCloseInsightModal}
+  onSave={handleSaveInsight}
+  tags={notebookState.tags}
+  hypotheses={notebookState.hypotheses}
+  onAddTag={handleAddTag}
+/>
 </div>
 </div>
 );

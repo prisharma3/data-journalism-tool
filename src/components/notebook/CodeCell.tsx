@@ -3,6 +3,7 @@
 import { useState, useRef } from 'react';
 import Editor from '@monaco-editor/react';
 import { Play, Trash2, Plus, ChevronUp, ChevronDown, Check, X, Loader, Sparkles, Edit2 } from 'lucide-react';
+import HypothesisTagSelector from './HypothesisTagSelector';
 
 interface CodeCellProps {
     cell: {
@@ -10,6 +11,7 @@ interface CodeCellProps {
       type: 'code';
       content: string;
       query?: string;
+      hypothesisTags?: string[]; // Add this
       output?: {
         text?: string;
         plot?: string;
@@ -30,29 +32,33 @@ interface CodeCellProps {
     onMoveUp?: (id: string) => void;
     onMoveDown?: (id: string) => void;
     onGenerateCode?: (id: string, query: string) => void;
-    onAddInsight?: (cellId: string) => void; // NEW
+    onAddInsight?: (cellId: string) => void;
+    onUpdateHypothesisTags?: (cellId: string, tags: string[]) => void; // Add this
+    hypotheses?: Array<{ id: string; content: string; createdAt: Date }>; // Add this
     canMoveUp: boolean;
     canMoveDown: boolean;
     datasetInfo?: any;
   }
 
-export default function CodeCell({
-  cell,
-  isSelected,
-  onExecute,
-  onDelete,
-  onUpdate,
-  onSelect,
-  onAddBelow,
-  onAddAbove,
-  onMoveUp,
-  onMoveDown,
-  onGenerateCode,
-  onAddInsight, // NEW
-  canMoveUp,
-  canMoveDown,
-  datasetInfo,
-}: CodeCellProps) {
+  export default function CodeCell({
+    cell,
+    isSelected,
+    onExecute,
+    onDelete,
+    onUpdate,
+    onSelect,
+    onAddBelow,
+    onAddAbove,
+    onMoveUp,
+    onMoveDown,
+    onGenerateCode,
+    onAddInsight,
+    onUpdateHypothesisTags, // Add this
+    hypotheses, // Add this
+    canMoveUp,
+    canMoveDown,
+    datasetInfo,
+  }: CodeCellProps) {
   const [isHovered, setIsHovered] = useState(false);
   const [showQueryInput, setShowQueryInput] = useState(!cell.content && !cell.query);
   const [queryText, setQueryText] = useState(cell.query || '');
@@ -298,6 +304,18 @@ export default function CodeCell({
           />
         </div>
       )}
+
+
+{/* Hypothesis Tag Selector - NEW SECTION */}
+{onUpdateHypothesisTags && hypotheses && hypotheses.length > 0 && (
+  <div className="px-3 py-2 bg-gray-50 border-t border-gray-200">
+    <HypothesisTagSelector
+      hypotheses={hypotheses}
+      selectedTags={cell.hypothesisTags || []}
+      onTagsChange={(tags) => onUpdateHypothesisTags(cell.id, tags)}
+    />
+  </div>
+)}
 
       {/* Output Display */}
       {(cell.output || cell.error) && (

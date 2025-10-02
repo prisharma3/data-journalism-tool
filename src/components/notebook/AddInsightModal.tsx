@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { X, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import HypothesisTagSelector from './HypothesisTagSelector';
 
 interface Tag {
   id: string;
@@ -11,12 +12,13 @@ interface Tag {
 }
 
 interface AddInsightModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onSave: (content: string, tagId: string) => void;
-  tags: Tag[];
-  onAddTag?: (name: string, color: string) => string;
-}
+    isOpen: boolean;
+    onClose: () => void;
+    onSave: (content: string, tagId: string, hypothesisTags: string[]) => void;
+    tags: Tag[];
+    hypotheses: Array<{ id: string; content: string; createdAt: Date }>;
+    onAddTag?: (name: string, color: string) => string;
+  }
 
 const PRESET_COLORS = [
   '#9C27B0', // Purple
@@ -34,21 +36,25 @@ export default function AddInsightModal({
   onClose,
   onSave,
   tags,
+  hypotheses,
   onAddTag,
 }: AddInsightModalProps) {
-  const [content, setContent] = useState('');
-  const [selectedTagId, setSelectedTagId] = useState(tags[0]?.id || '');
-  const [showNewTagForm, setShowNewTagForm] = useState(false);
-  const [newTagName, setNewTagName] = useState('');
-  const [newTagColor, setNewTagColor] = useState(PRESET_COLORS[0]);
+    const [content, setContent] = useState('');
+    const [selectedTagId, setSelectedTagId] = useState(tags[0]?.id || '');
+    const [showNewTagForm, setShowNewTagForm] = useState(false);
+    const [newTagName, setNewTagName] = useState('');
+    const [newTagColor, setNewTagColor] = useState(PRESET_COLORS[0]);   
+    const [selectedHypothesisTags, setSelectedHypothesisTags] = useState<string[]>([]);
+
 
   if (!isOpen) return null;
 
   const handleSave = () => {
     if (content.trim() && selectedTagId) {
-      onSave(content.trim(), selectedTagId);
+      onSave(content.trim(), selectedTagId, selectedHypothesisTags);
       setContent('');
       setSelectedTagId(tags[0]?.id || '');
+      setSelectedHypothesisTags([]);
       onClose();
     }
   };
@@ -193,7 +199,23 @@ export default function AddInsightModal({
               </div>
             )}
           </div>
+
+                    {/* Hypothesis Tag Selector */}
+                    {hypotheses.length > 0 && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Link to Hypotheses (Optional)
+              </label>
+              <HypothesisTagSelector
+                hypotheses={hypotheses}
+                selectedTags={selectedHypothesisTags}
+                onTagsChange={setSelectedHypothesisTags}
+              />
+            </div>
+          )}
         </div>
+
+        
 
         {/* Footer */}
         <div className="flex justify-end gap-2 p-4 border-t border-gray-200">

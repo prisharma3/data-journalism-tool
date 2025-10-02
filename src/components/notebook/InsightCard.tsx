@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Edit2, Trash2, Save, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import HypothesisTagSelector from './HypothesisTagSelector';
 
 interface Tag {
   id: string;
@@ -11,33 +12,38 @@ interface Tag {
 }
 
 interface InsightCardProps {
-  insight: {
-    id: string;
-    cellId: string;
-    content: string;
-    tagId: string;
-    createdAt: Date;
-  };
-  tag: Tag;
-  onUpdate: (insightId: string, content: string, tagId: string) => void;
-  onDelete: (insightId: string) => void;
-  allTags: Tag[];
-}
+    insight: {
+      id: string;
+      cellId: string;
+      content: string;
+      tagId: string;
+      hypothesisTags?: string[];
+      createdAt: Date;
+    };
+    tag: Tag;
+    onUpdate: (insightId: string, content: string, tagId: string, hypothesisTags?: string[]) => void;
+    onDelete: (insightId: string) => void;
+    allTags: Tag[];
+    hypotheses: Array<{ id: string; content: string; createdAt: Date }>;
+  }
 
 export default function InsightCard({
   insight,
   tag,
   onUpdate,
   onDelete,
+  hypotheses,
   allTags,
 }: InsightCardProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState(insight.content);
   const [editTagId, setEditTagId] = useState(insight.tagId);
+  const [editHypothesisTags, setEditHypothesisTags] = useState<string[]>(insight.hypothesisTags || []);
+
 
   const handleSave = () => {
     if (editContent.trim()) {
-      onUpdate(insight.id, editContent.trim(), editTagId);
+      onUpdate(insight.id, editContent.trim(), editTagId, editHypothesisTags);
       setIsEditing(false);
     }
   };
@@ -45,6 +51,7 @@ export default function InsightCard({
   const handleCancel = () => {
     setEditContent(insight.content);
     setEditTagId(insight.tagId);
+    setEditHypothesisTags(insight.hypothesisTags || []);
     setIsEditing(false);
   };
 
@@ -127,8 +134,8 @@ export default function InsightCard({
         </div>
       </div>
 
-      {/* Content */}
-      {isEditing ? (
+{/* Content */}
+{isEditing ? (
         <textarea
           value={editContent}
           onChange={(e) => setEditContent(e.target.value)}
@@ -141,6 +148,34 @@ export default function InsightCard({
           {insight.content}
         </p>
       )}
+
+      {/* Hypothesis Tags */}
+      <div className="mt-2 pt-2 border-t" style={{ borderColor: `${tag.color}40` }}>
+        {isEditing ? (
+          <HypothesisTagSelector
+            hypotheses={hypotheses}
+            selectedTags={editHypothesisTags}
+            onTagsChange={setEditHypothesisTags}
+          />
+        ) : (
+          insight.hypothesisTags && insight.hypothesisTags.length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {insight.hypothesisTags.map((tagId, index) => {
+                const hypIndex = hypotheses.findIndex(h => h.id === tagId);
+                return hypIndex !== -1 ? (
+                  <span
+                    key={tagId}
+                    className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium text-white"
+                    style={{ backgroundColor: '#9C27B0' }}
+                  >
+                    H{hypIndex + 1}
+                  </span>
+                ) : null;
+              })}
+            </div>
+          )
+        )}
+      </div>
     </div>
   );
 }

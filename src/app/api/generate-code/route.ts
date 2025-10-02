@@ -71,23 +71,25 @@ function buildPrompt(query: string, datasetInfo?: any): string {
     }
   
     prompt += `
-  CRITICAL Requirements:
-  1. The 'dataset' variable is ALREADY LOADED - DO NOT create dummy data or check if it exists
-  2. pandas is imported as pd, numpy as np, matplotlib.pyplot as plt
-  3. For matplotlib: DO NOT use plt.show() - the system automatically captures plots
-  4. Write concise code with brief comments only for complex operations
-  5. Use print() to display results and insights
-  6. Handle edge cases (missing values, wrong column names) with try-except if needed
-  7. Keep the code SHORT and focused on the specific request
-  
-  IMPORTANT: 
-  - DO NOT include dummy data creation
-  - DO NOT use plt.show()
-  - DO NOT add verbose validation unless specifically requested
-  - Assume 'dataset' is already available and valid
-  
-  Generate ONLY the Python code needed to fulfill the request. Add comments only for complex logic.
-  `;
+    CRITICAL Requirements:
+    1. The 'dataset' variable is ALREADY LOADED - DO NOT create dummy data or check if it exists
+    2. Available libraries: pandas (as pd), numpy (as np), matplotlib.pyplot (as plt)
+    3. DO NOT use seaborn - it's not available. Use matplotlib instead
+    4. For matplotlib: DO NOT use plt.show() - the system automatically captures plots
+    5. Write concise code with brief comments only for complex operations
+    6. Use print() to display results and insights
+    7. Handle edge cases (missing values, wrong column names) with try-except if needed
+    8. Keep the code SHORT and focused on the specific request
+    
+    IMPORTANT: 
+    - DO NOT include dummy data creation
+    - DO NOT use plt.show()
+    - DO NOT use seaborn (use matplotlib.pyplot instead)
+    - DO NOT add verbose validation unless specifically requested
+    - Assume 'dataset' is already available and valid
+    
+    Generate ONLY the Python code needed to fulfill the request. Add comments only for complex logic.
+    `;
   
     return prompt;
   }
