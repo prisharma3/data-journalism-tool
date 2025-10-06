@@ -4,6 +4,7 @@ import { useState, useRef } from 'react';
 import Editor from '@monaco-editor/react';
 import { Play, Trash2, Plus, ChevronUp, ChevronDown, Check, X, Loader, Sparkles, Edit2 } from 'lucide-react';
 import HypothesisTagSelector from './HypothesisTagSelector';
+import InsightSticky from './InsightSticky';
 
 interface CodeCellProps {
     cell: {
@@ -11,7 +12,7 @@ interface CodeCellProps {
       type: 'code';
       content: string;
       query?: string;
-      hypothesisTags?: string[]; // Add this
+      hypothesisTags?: string[];
       output?: {
         text?: string;
         plot?: string;
@@ -34,8 +35,21 @@ interface CodeCellProps {
     onMoveDown?: (id: string) => void;
     onGenerateCode?: (id: string, query: string) => void;
     onAddInsight?: (cellId: string) => void;
-    onUpdateHypothesisTags?: (cellId: string, tags: string[]) => void; // Add this
-    hypotheses?: Array<{ id: string; content: string; createdAt: Date }>; // Add this
+    onAddTag?: (name: string, color: string) => string;
+    onUpdateHypothesisTags?: (cellId: string, tags: string[]) => void;
+    hypotheses?: Array<{ id: string; content: string; createdAt: Date }>;
+    // ADD THESE NEW PROPS:
+    insights?: Array<{
+      id: string;
+      cellId: string;
+      content: string;
+      tagId: string;
+      hypothesisTags?: string[];
+      createdAt: Date;
+    }>;
+    tags?: Array<{ id: string; name: string; color: string }>;
+    onUpdateInsight?: (insightId: string, content: string, tagId: string, hypothesisTags?: string[]) => void;
+    onDeleteInsight?: (insightId: string) => void;
     canMoveUp: boolean;
     canMoveDown: boolean;
     datasetInfo?: any;
@@ -44,7 +58,7 @@ interface CodeCellProps {
   export default function CodeCell({
     cell,
     isSelected,
-    isHighlighted = false, 
+    isHighlighted = false,
     onExecute,
     onDelete,
     onUpdate,
@@ -55,8 +69,13 @@ interface CodeCellProps {
     onMoveDown,
     onGenerateCode,
     onAddInsight,
-    onUpdateHypothesisTags, // Add this
-    hypotheses, // Add this
+    onUpdateHypothesisTags,
+    hypotheses,
+    insights = [], // ADD THIS
+    tags = [], // ADD THIS
+    onUpdateInsight, // ADD THIS
+    onDeleteInsight, // ADD THIS
+    onAddTag, // ADD THIS
     canMoveUp,
     canMoveDown,
     datasetInfo,
@@ -321,60 +340,77 @@ interface CodeCellProps {
   </div>
 )}
 
-      {/* Output Display */}
-      {(cell.output || cell.error) && (
-        <div
-          className="border-t border-gray-200 p-2 max-h-96 overflow-auto"
-          style={{
-            backgroundColor: cell.error ? '#ffebee' : '#fafafa',
-          }}
+{/* Output Display */}
+{(cell.output || cell.error) && (
+  <div className="relative" style={{ overflow: 'visible' }}>
+    <div
+      className="border-t border-gray-200 p-2 max-h-96"
+      style={{
+        backgroundColor: cell.error ? '#ffebee' : '#fafafa',
+        overflowY: 'auto',
+        overflowX: 'visible'
+      }}
+    >
+      {/* Add Insight Button - Top Right */}
+      {cell.output && !cell.error && onAddInsight && (
+        <div className="flex justify-end mb-2">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onAddInsight(cell.id);
+            }}
+            className="flex items-center gap-1 px-3 py-1.5 bg-blue-500 text-white rounded text-xs hover:bg-blue-600 transition-colors shadow-sm"
+            title="Add Insight"
           >
-          {/* Add Insight Button - Top Right */}
-          {cell.output && !cell.error && onAddInsight && (
-            <div className="flex justify-end mb-2">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onAddInsight(cell.id);
-                }}
-                className="flex items-center gap-1 px-3 py-1.5 bg-blue-500 text-white rounded text-xs hover:bg-blue-600 transition-colors shadow-sm"
-                title="Add Insight"
-              >
-                <Plus size={14} />
-                Add Insight
-              </button>
-            </div>
-          )}
-          {cell.error && (
-            <div className="text-red-700 font-mono text-xs">
-              <strong>Error:</strong>
-              <pre className="mt-1 whitespace-pre-wrap">{cell.error}</pre>
-            </div>
-          )}
-
-          {cell.output?.text && (
-            <div className="font-mono text-xs">
-              <pre className="m-0 whitespace-pre-wrap">{cell.output.text}</pre>
-            </div>
-          )}
-
-          {cell.output?.plot && (
-            <div className="mt-2">
-              <img
-                src={cell.output.plot}
-                alt="Plot output"
-                className="max-w-full h-auto rounded"
-              />
-            </div>
-          )}
-
-          {cell.output?.executionTime && (
-            <div className="text-[10px] text-gray-600 mt-1 italic">
-              Execution time: {cell.output.executionTime}ms
-            </div>
-          )}
+            <Plus size={14} />
+            Add Insight
+          </button>
         </div>
       )}
+      
+      {cell.error && (
+        <div className="text-red-700 font-mono text-xs">
+          <strong>Error:</strong>
+          <pre className="mt-1 whitespace-pre-wrap">{cell.error}</pre>
+        </div>
+      )}
+
+      {cell.output?.text && (
+        <div className="font-mono text-xs">
+          <pre className="m-0 whitespace-pre-wrap">{cell.output.text}</pre>
+        </div>
+      )}
+
+      {cell.output?.plot && (
+        <div className="mt-2">
+          <img
+            src={cell.output.plot}
+            alt="Plot output"
+            className="max-w-full h-auto rounded"
+          />
+        </div>
+      )}
+
+      {cell.output?.executionTime && (
+        <div className="text-[10px] text-gray-600 mt-1 italic">
+          Execution time: {cell.output.executionTime}ms
+        </div>
+      )}
+    </div>
+
+    {/* Insight Stickies - positioned at right edge OUTSIDE the scrollable div */}
+    {insights && tags && onUpdateInsight && onDeleteInsight && (
+      <InsightSticky
+        insights={insights.filter(i => i.cellId === cell.id)}
+        tags={tags}
+        hypotheses={hypotheses || []}
+        onUpdate={onUpdateInsight}
+        onDelete={onDeleteInsight}
+        onAddTag={onAddTag}
+      />
+    )}
+  </div>
+)}
     </div>
   );
 }

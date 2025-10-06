@@ -539,9 +539,23 @@ const handleUpdateInsight = useCallback((insightId: string, content: string, tag
   }, []);
 
   // Handle opening insight modal
+// Handle opening insight modal - now creates insight directly in edit mode
 const handleOpenInsightModal = useCallback((cellId: string) => {
-    setInsightModal({ isOpen: true, cellId });
-  }, []);
+    // Create a new blank insight in edit mode
+    const newInsight: Insight = {
+      id: `insight-${Date.now()}`,
+      cellId,
+      content: '',
+      tagId: notebookState.tags[0]?.id || 'tag-default', // Use first tag as default
+      hypothesisTags: [],
+      createdAt: new Date(),
+    };
+    
+    setNotebookState(prev => ({
+      ...prev,
+      insights: [...prev.insights, newInsight],
+    }));
+  }, [notebookState.tags]);
   
   // Handle closing insight modal
   const handleCloseInsightModal = useCallback(() => {
@@ -607,8 +621,8 @@ const handleSaveInsight = useCallback((content: string, tagId: string, hypothesi
 
 {/* Two Column Layout: Notebook + Insights */}
 <div className="flex-1 flex overflow-hidden">
-  {/* Left Column: Notebook Content */}
-  <div className="flex-1 overflow-y-auto p-4" style={{ maxWidth: '70%' }}>
+{/* Left Column: Notebook Content */}
+<div className="flex-1 overflow-y-auto p-4 pr-16" style={{ maxWidth: '80%' }}>
     {/* Dataset Upload Section */}
     <DatasetSection
       dataset={notebookState.dataset}
@@ -629,39 +643,44 @@ const handleSaveInsight = useCallback((content: string, tagId: string, hypothesi
   </div>
 ) : (
     notebookState.cells.map((cell, index) => (
-        <div key={`${cell.id}-${index}`} ref={(el) => {
-          if (el) cellRefs.current.set(cell.id, el);
-        }}>
-          <CodeCell
-            cell={cell}
-            isSelected={notebookState.selectedCellId === cell.id}
-            isHighlighted={highlightedCellId === cell.id}
-            onExecute={executeCell}
-            onDelete={deleteCell}
-            onUpdate={updateCell}
-            onSelect={selectCell}
-            onAddAbove={(id) => addCell(id, 'above')}
-            onAddBelow={(id) => addCell(id, 'below')}
-            onMoveUp={(id) => moveCell(id, 'up')}
-            onMoveDown={(id) => moveCell(id, 'down')}
-            onGenerateCode={handleGenerateCode}
-            onAddInsight={handleOpenInsightModal}
-            onUpdateHypothesisTags={handleUpdateCellHypothesisTags}
-            hypotheses={notebookState.hypotheses}
-            canMoveUp={index > 0}
-            canMoveDown={index < notebookState.cells.length - 1}
-            datasetInfo={notebookState.dataset?.summary}
-          />
-        </div>
+<div key={`${cell.id}-${index}`} ref={(el) => {
+  if (el) cellRefs.current.set(cell.id, el);
+}}>
+  <CodeCell
+    cell={cell}
+    isSelected={notebookState.selectedCellId === cell.id}
+    isHighlighted={highlightedCellId === cell.id}
+    onExecute={executeCell}
+    onDelete={deleteCell}
+    onUpdate={updateCell}
+    onSelect={selectCell}
+    onAddAbove={(id) => addCell(id, 'above')}
+    onAddBelow={(id) => addCell(id, 'below')}
+    onMoveUp={(id) => moveCell(id, 'up')}
+    onMoveDown={(id) => moveCell(id, 'down')}
+    onGenerateCode={handleGenerateCode}
+    onAddInsight={handleOpenInsightModal}
+    onUpdateHypothesisTags={handleUpdateCellHypothesisTags}
+    hypotheses={notebookState.hypotheses}
+    insights={notebookState.insights}
+    tags={notebookState.tags}
+    onUpdateInsight={handleUpdateInsight}
+    onDeleteInsight={handleDeleteInsight}
+    canMoveUp={index > 0}
+    canMoveDown={index < notebookState.cells.length - 1}
+    datasetInfo={notebookState.dataset?.summary}
+  />
+</div>
       ))
 )}
   </div>
 
       {/* Right Column: Insights Margin */}
-      <div 
-        className="w-[30%] bg-gray-100 border-l border-gray-300 overflow-y-auto p-4"
-        style={{ minWidth: '300px', maxWidth: '400px' }}
-      >
+{/* Right Column: Insights Margin */}
+<div 
+  className="w-[20%] bg-gray-100 border-l border-gray-300 overflow-y-auto p-4"
+  style={{ minWidth: '250px', maxWidth: '300px' }}
+>
         <div className="sticky top-0 mb-4 pb-2 bg-gray-100 z-10 border-b border-gray-300">
           <h3 className="text-sm font-semibold text-gray-700">Insights</h3>
           <p className="text-xs text-gray-500 mt-1">
@@ -700,16 +719,6 @@ const handleSaveInsight = useCallback((content: string, tagId: string, hypothesi
 )}
         </div>
       </div>
-
-{/* Add Insight Modal */}
-<AddInsightModal
-  isOpen={insightModal.isOpen}
-  onClose={handleCloseInsightModal}
-  onSave={handleSaveInsight}
-  tags={notebookState.tags}
-  hypotheses={notebookState.hypotheses}
-  onAddTag={handleAddTag}
-/>
 </div>
 </div>
 );
