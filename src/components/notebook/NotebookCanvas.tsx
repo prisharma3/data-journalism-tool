@@ -8,6 +8,7 @@ import DatasetSection from './DatasetSection';
 import HypothesisSection from './HypothesisSection';
 import InsightCard from './InsightCard';
 import AddInsightModal from './AddInsightModal';
+import { useRef } from 'react';
 
 interface NotebookCanvasProps {
   projectId: string;
@@ -116,6 +117,29 @@ export default function NotebookCanvas({ projectId }: NotebookCanvasProps) {
         isOpen: false,
         cellId: null,
       });
+
+  const [highlightedCellId, setHighlightedCellId] = useState<string | null>(null);
+  const [highlightedInsightId, setHighlightedInsightId] = useState<string | null>(null);
+  const cellRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const insightRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+
+  // Add this helper function to scroll to a cell
+const scrollToCell = useCallback((cellId: string) => {
+    const cellElement = cellRefs.current.get(cellId);
+    if (cellElement) {
+      cellElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setHighlightedCellId(cellId);
+      // Clear highlight after 2 seconds
+      setTimeout(() => setHighlightedCellId(null), 2000);
+    }
+  }, []);
+  
+  // Add this handler for insight clicks
+  const handleInsightClick = useCallback((insightId: string, cellId: string) => {
+    scrollToCell(cellId);
+    setHighlightedInsightId(insightId);
+    setTimeout(() => setHighlightedInsightId(null), 2000);
+  }, [scrollToCell]);
 
   // Load cells from API or store
   useEffect(() => {
@@ -598,35 +622,39 @@ const handleSaveInsight = useCallback((content: string, tagId: string, hypothesi
       onHypothesesChange={handleHypothesesChange}
     />
 
-    {notebookState.cells.length === 0 ? (
-      <div className="text-center py-20 text-gray-500">
-        <Plus size={48} className="mx-auto mb-4 opacity-30" />
-        <p>No cells yet. Click "Add Cell" to start coding!</p>
-      </div>
-    ) : (
-        notebookState.cells.map((cell, index) => (
-            <CodeCell
-              key={`${cell.id}-${index}`}
-              cell={cell}
-              isSelected={notebookState.selectedCellId === cell.id}
-              onExecute={executeCell}
-              onDelete={deleteCell}
-              onUpdate={updateCell}
-              onSelect={selectCell}
-              onAddAbove={(id) => addCell(id, 'above')}
-              onAddBelow={(id) => addCell(id, 'below')}
-              onMoveUp={(id) => moveCell(id, 'up')}
-              onMoveDown={(id) => moveCell(id, 'down')}
-              onGenerateCode={handleGenerateCode}
-              onAddInsight={handleOpenInsightModal}
-              onUpdateHypothesisTags={handleUpdateCellHypothesisTags}
-              hypotheses={notebookState.hypotheses}
-              canMoveUp={index > 0}
-              canMoveDown={index < notebookState.cells.length - 1}
-              datasetInfo={notebookState.dataset?.summary}
-            />
-          ))
-    )}
+{notebookState.cells.length === 0 ? (
+  <div className="text-center py-20 text-gray-500">
+    <Plus size={48} className="mx-auto mb-4 opacity-30" />
+    <p>No cells yet. Click "Add Cell" to start coding!</p>
+  </div>
+) : (
+    notebookState.cells.map((cell, index) => (
+        <div key={`${cell.id}-${index}`} ref={(el) => {
+          if (el) cellRefs.current.set(cell.id, el);
+        }}>
+          <CodeCell
+            cell={cell}
+            isSelected={notebookState.selectedCellId === cell.id}
+            isHighlighted={highlightedCellId === cell.id}
+            onExecute={executeCell}
+            onDelete={deleteCell}
+            onUpdate={updateCell}
+            onSelect={selectCell}
+            onAddAbove={(id) => addCell(id, 'above')}
+            onAddBelow={(id) => addCell(id, 'below')}
+            onMoveUp={(id) => moveCell(id, 'up')}
+            onMoveDown={(id) => moveCell(id, 'down')}
+            onGenerateCode={handleGenerateCode}
+            onAddInsight={handleOpenInsightModal}
+            onUpdateHypothesisTags={handleUpdateCellHypothesisTags}
+            hypotheses={notebookState.hypotheses}
+            canMoveUp={index > 0}
+            canMoveDown={index < notebookState.cells.length - 1}
+            datasetInfo={notebookState.dataset?.summary}
+          />
+        </div>
+      ))
+)}
   </div>
 
       {/* Right Column: Insights Margin */}
@@ -653,15 +681,20 @@ const handleSaveInsight = useCallback((content: string, tagId: string, hypothesi
     if (!tag) return null;
     
     return (
-      <InsightCard
-        key={insight.id}
-        insight={insight}
-        tag={tag}
-        onUpdate={handleUpdateInsight}
-        onDelete={handleDeleteInsight}
-        allTags={notebookState.tags}
-        hypotheses={notebookState.hypotheses}
-      />
+<div key={insight.id} ref={(el) => {
+  if (el) insightRefs.current.set(insight.id, el);
+}}>
+  <InsightCard
+    insight={insight}
+    tag={tag}
+    onUpdate={handleUpdateInsight}
+    onDelete={handleDeleteInsight}
+    onClick={() => handleInsightClick(insight.id, insight.cellId)}
+    isHighlighted={highlightedInsightId === insight.id}
+    allTags={notebookState.tags}
+    hypotheses={notebookState.hypotheses}
+  />
+</div>
     );
   })
 )}

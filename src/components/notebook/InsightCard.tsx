@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { Edit2, Trash2, Save, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import HypothesisTagSelector from './HypothesisTagSelector';
+
 
 interface Tag {
   id: string;
@@ -23,6 +24,8 @@ interface InsightCardProps {
     tag: Tag;
     onUpdate: (insightId: string, content: string, tagId: string, hypothesisTags?: string[]) => void;
     onDelete: (insightId: string) => void;
+    onClick?: () => void; 
+    isHighlighted?: boolean;
     allTags: Tag[];
     hypotheses: Array<{ id: string; content: string; createdAt: Date }>;
   }
@@ -32,6 +35,8 @@ export default function InsightCard({
   tag,
   onUpdate,
   onDelete,
+  onClick, 
+  isHighlighted = false, 
   hypotheses,
   allTags,
 }: InsightCardProps) {
@@ -56,13 +61,15 @@ export default function InsightCard({
   };
 
   return (
-    <div
-      className="rounded-lg border-2 p-3 shadow-sm transition-all hover:shadow-md"
-      style={{
-        borderColor: tag.color,
-        backgroundColor: `${tag.color}15`, // 15 is hex for ~8% opacity
-      }}
-    >
+<div
+  className="rounded-lg border-2 p-3 shadow-sm transition-all hover:shadow-md cursor-pointer"
+  onClick={onClick}
+  style={{
+    borderColor: isHighlighted ? '#fbbf24' : tag.color,
+    backgroundColor: isHighlighted ? '#fef3c7' : `${tag.color}15`,
+    boxShadow: isHighlighted ? '0 0 0 3px rgba(251, 191, 36, 0.3)' : undefined,
+  }}
+>
       {/* Tag Header */}
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">

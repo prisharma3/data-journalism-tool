@@ -23,6 +23,7 @@ interface CodeCellProps {
       isGenerating?: boolean;
     };
     isSelected: boolean;
+    isHighlighted?: boolean;
     onExecute: (id: string) => void;
     onDelete: (id: string) => void;
     onUpdate: (id: string, content: string) => void;
@@ -43,6 +44,7 @@ interface CodeCellProps {
   export default function CodeCell({
     cell,
     isSelected,
+    isHighlighted = false, 
     onExecute,
     onDelete,
     onUpdate,
@@ -98,16 +100,18 @@ interface CodeCellProps {
   };
 
   return (
-    <div
-      className="code-cell mb-2 bg-white rounded border transition-all"
-      onClick={() => onSelect(cell.id)}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-      style={{
-        borderWidth: isSelected ? '2px' : '1px',
-        borderColor: isSelected ? '#007acc' : '#e0e0e0',
-      }}
-    >
+<div
+  className="code-cell mb-2 bg-white rounded border transition-all"
+  onClick={() => onSelect(cell.id)}
+  onMouseEnter={() => setIsHovered(true)}
+  onMouseLeave={() => setIsHovered(false)}
+  style={{
+    borderWidth: isSelected ? '2px' : '1px',
+    borderColor: isHighlighted ? '#fbbf24' : (isSelected ? '#007acc' : '#e0e0e0'),
+    backgroundColor: isHighlighted ? '#fef3c7' : 'white',
+    boxShadow: isHighlighted ? '0 0 0 3px rgba(251, 191, 36, 0.3)' : 'none',
+  }}
+>
       {/* Cell Toolbar */}
       <div
         className="flex items-center justify-between px-2 py-1 bg-gray-50 border-b border-gray-200 transition-opacity"
