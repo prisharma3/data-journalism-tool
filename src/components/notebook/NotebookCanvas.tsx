@@ -355,17 +355,30 @@ const executeCell = useCallback(async (cellId: string) => {
 // Load dataset if available
 if (notebookState.dataset) {
     try {
+        console.log('🔍 Checking dataset availability for cell:', cellId);
+        console.log('📁 Dataset filename:', notebookState.dataset.filename);
       // Check if dataset variable exists in Python, if not, load it
       const datasetExists = await pyodideService.checkVariableExists('dataset');
+      console.log('✅ Dataset exists in Python:', datasetExists);
+
       if (!datasetExists) {
         // Write file if not in filesystem
+        console.log('⚠️ Dataset not found in Python, reloading...');
+
         try {
           await pyodideService.getDatasetVariable(notebookState.dataset.filename, 'dataset');
+          console.log('✅ Dataset reloaded successfully');
+
         } catch (err) {
           // If dataset not in filesystem, write it first
+          console.log('❌ Dataset not in filesystem, writing file first...');
+
           await pyodideService.writeFile(notebookState.dataset.filename, notebookState.dataset.data);
           await pyodideService.getDatasetVariable(notebookState.dataset.filename, 'dataset');
+          console.log('✅ Dataset written and loaded successfully');
         }
+      } else {
+        console.log('✅ Dataset already available in Python');
       }
     } catch (err) {
       console.error('Error loading dataset:', err);

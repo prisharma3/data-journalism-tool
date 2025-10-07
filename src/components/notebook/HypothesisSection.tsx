@@ -127,11 +127,11 @@ export default function HypothesisSection({
           </Button> */}
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-3 px-4">
           {hypotheses.map((hypothesis, index) => (
             <div
               key={hypothesis.id}
-              className="p-4 rounded-lg border transition-all"
+              className="p-3 rounded-lg border transition-all"
               style={{ 
                 backgroundColor: '#F3E5F5',
                 borderColor: editingId === hypothesis.id ? '#9C27B0' : '#E1BEE7',
@@ -155,12 +155,12 @@ export default function HypothesisSection({
                     onFocus={() => setEditingId(hypothesis.id)}
                     onBlur={() => setEditingId(null)}
                     placeholder="Enter your research hypothesis..."
-                    className="w-full p-2 rounded border border-purple-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 focus:outline-none resize-none bg-white text-gray-900"
-                    rows={3}
-                    style={{ minHeight: '80px' }}
+                    className="w-full p-1 rounded border border-purple-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 focus:outline-none resize-none bg-white text-gray-900"
+                    rows={2}
+                    style={{ minHeight: '50px' }}
                   />
                 </div>
-  
+
                 <Button
                   onClick={() => deleteHypothesis(hypothesis.id)}
                   size="sm"
