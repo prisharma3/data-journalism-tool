@@ -1,197 +1,223 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Search, Lightbulb, Eye, BookOpen } from 'lucide-react';
+import { useEditor, EditorContent } from '@tiptap/react';
+import StarterKit from '@tiptap/starter-kit';
+import Placeholder from '@tiptap/extension-placeholder';
+import CharacterCount from '@tiptap/extension-character-count';
+import { useEffect, useState } from 'react';
+import { WritingToolbar } from './WritingToolbar';
+import { WritingStats } from './WritingStats';
+import { useDebounce } from '@/hooks/useDebounce';
+import { useAuthStore } from '@/stores/authStore';
 import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
+import { Save, Eye, Lightbulb } from 'lucide-react';
 
 interface WritingEditorProps {
   projectId: string;
+  initialContent?: string;
 }
 
-interface WritingSuggestion {
-  id: string;
-  type: 'tone' | 'grammar' | 'evidence' | 'clarity';
-  start: number;
-  end: number;
-  text: string;
-  suggestion: string;
-  color: string;
-}
+export default function WritingEditor({ projectId, initialContent = '' }: WritingEditorProps) {
+  const [isSaving, setIsSaving] = useState(false);
+  const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const [content, setContent] = useState(initialContent);
+  const { token } = useAuthStore();
 
-export default function WritingEditor({ projectId }: WritingEditorProps) {
-  const [content, setContent] = useState('');
-  const [suggestions, setSuggestions] = useState<WritingSuggestion[]>([]);
-  const [showRemembranceAgent, setShowRemembranceAgent] = useState(false);
-  const [showAlternativeAnalysis, setShowAlternativeAnalysis] = useState(false);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  // Initialize Tiptap editor with immediatelyRender: false to fix SSR
+  const editor = useEditor({
+    immediatelyRender: false,
+    extensions: [
+      StarterKit.configure({
+        heading: {
+          levels: [1, 2, 3],
+        },
+      }),
+      Placeholder.configure({
+        placeholder: 'Start writing your data journalism article...',
+      }),
+      CharacterCount,
+    ],
+    content: initialContent,
+    editorProps: {
+      attributes: {
+        class: 'prose prose-lg max-w-none focus:outline-none min-h-[600px] p-12',
+      },
+    },
+    onUpdate: ({ editor }) => {
+      const html = editor.getHTML();
+      setContent(html);
+    },
+  });
 
-  // Load content from API or store
+  // Debounced content for auto-save (save after 2 seconds of no typing)
+  const debouncedContent = useDebounce(content, 2000);
+
+  // Auto-save effect
   useEffect(() => {
-    // TODO: Fetch article content from API based on projectId
-    // fetchArticleContent(projectId);
-  }, [projectId]);
-
-  // Analyze writing for suggestions
-  useEffect(() => {
-    if (content.trim().length > 50) {
-      const timeoutId = setTimeout(() => {
-        analyzeWriting();
-      }, 1000); // Debounce analysis
-
-      return () => clearTimeout(timeoutId);
-    } else {
-      setSuggestions([]);
+    if (debouncedContent && debouncedContent !== initialContent && editor) {
+      autoSave(debouncedContent);
     }
-  }, [content]);
+  }, [debouncedContent]);
 
-  const analyzeWriting = async () => {
-    if (isAnalyzing) return;
+  // Auto-save function
+  const autoSave = async (contentToSave: string) => {
+    if (!editor || !token) return;
     
-    setIsAnalyzing(true);
+    setIsSaving(true);
     try {
-      // TODO: Call AI API to analyze writing
-      // const analysis = await analyzeWritingContent(content, projectId);
-      // setSuggestions(analysis.suggestions);
+      const wordCount = editor.storage.characterCount.words() || 0;
+      
+      const response = await fetch(`/api/projects/${projectId}/article`, {
+        method: 'PUT',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          content: contentToSave,
+          word_count: wordCount,
+          auto_save: true,
+        }),
+      });
+
+      if (response.ok) {
+        setLastSaved(new Date());
+      } else {
+        console.error('Auto-save failed:', await response.text());
+      }
     } catch (error) {
-      console.error('Writing analysis failed:', error);
+      console.error('Auto-save failed:', error);
     } finally {
-      setIsAnalyzing(false);
+      setIsSaving(false);
     }
   };
 
-  const applySuggestion = (suggestionId: string) => {
-    const suggestion = suggestions.find(s => s.id === suggestionId);
-    if (!suggestion) return;
-
-    const beforeText = content.substring(0, suggestion.start);
-    const afterText = content.substring(suggestion.end);
-    const newContent = beforeText + suggestion.suggestion + afterText;
+  // Manual save function
+  const manualSave = async () => {
+    if (!editor || !token) return;
     
-    setContent(newContent);
-    setSuggestions(suggestions.filter(s => s.id !== suggestionId));
+    setIsSaving(true);
+    try {
+      const wordCount = editor.storage.characterCount.words() || 0;
+      
+      const response = await fetch(`/api/projects/${projectId}/article`, {
+        method: 'PUT',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          content: content,
+          word_count: wordCount,
+          auto_save: false,
+        }),
+      });
+
+      if (response.ok) {
+        setLastSaved(new Date());
+      } else {
+        console.error('Manual save failed:', await response.text());
+      }
+    } catch (error) {
+      console.error('Manual save failed:', error);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const handleContentChange = (newContent: string) => {
-    setContent(newContent);
-    // TODO: Auto-save content
-    // autoSaveContent(projectId, newContent);
-  };
+  if (!editor) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-gray-500">Loading editor...</div>
+      </div>
+    );
+  }
 
   return (
-    <div className="h-full flex flex-col bg-white">
-      {/* Writing Header */}
-      <div className="p-4 border-b border-gray-200">
-        <h3 className="text-lg font-semibold text-gray-900">Article Writing</h3>
-        <p className="text-sm text-gray-500 mt-1">AI-assisted writing with real-time suggestions</p>
-      </div>
-
-      {/* Action Buttons */}
-      <div className="p-4 border-b border-gray-200 space-y-2">
-        <Button
-          onClick={() => setShowRemembranceAgent(!showRemembranceAgent)}
-          variant="outline"
-          size="sm"
-          className="w-full flex items-center justify-center space-x-2"
-        >
-          <Eye className="w-4 h-4" />
-          <span>View Relevant Analysis</span>
-        </Button>
-        
-        <Button
-          onClick={() => setShowAlternativeAnalysis(!showAlternativeAnalysis)}
-          variant="outline"
-          size="sm"
-          className="w-full flex items-center justify-center space-x-2"
-        >
-          <Lightbulb className="w-4 h-4" />
-          <span>Suggest Alternative Analysis</span>
-        </Button>
-      </div>
-
-      {/* Writing Area */}
-      <div className="flex-1 flex flex-col">
-        {/* Text Editor */}
-        <div className="flex-1 p-4">
-          <Textarea
-            value={content}
-            onChange={(e) => handleContentChange(e.target.value)}
-            placeholder="Start writing your data journalism article..."
-            className="w-full h-full resize-none font-serif text-base leading-relaxed"
-            style={{ minHeight: '400px' }}
-          />
-          {isAnalyzing && (
-            <div className="mt-2 text-xs text-gray-500">
-              Analyzing writing...
-            </div>
-          )}
-        </div>
-
-        {/* Suggestions Panel */}
-        {suggestions.length > 0 && (
-          <div className="border-t border-gray-200 p-4 bg-gray-50">
-            <h4 className="text-sm font-medium text-gray-700 mb-3">Writing Suggestions</h4>
-            <div className="space-y-3 max-h-40 overflow-y-auto">
-              {suggestions.map((suggestion) => (
-                <div key={suggestion.id} className="bg-white p-3 rounded-lg border border-gray-200">
-                  <div className="flex items-start space-x-2">
-                    <div 
-                      className="w-3 h-3 rounded-full mt-1 flex-shrink-0"
-                      style={{ backgroundColor: suggestion.color }}
-                    />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm text-gray-600 mb-1">
-                        <span className="font-medium">"{suggestion.text}"</span>
-                      </p>
-                      <p className="text-xs text-gray-500 mb-2">{suggestion.suggestion}</p>
-                      <Button
-                        onClick={() => applySuggestion(suggestion.id)}
-                        size="sm"
-                        variant="outline"
-                        className="text-xs"
-                      >
-                        Apply Suggestion
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
+    <div className="flex flex-col h-full w-full bg-white overflow-hidden">
+      {/* Top toolbar - Two rows for better space management */}
+      <div className="border-b border-gray-200 bg-gray-50 flex-shrink-0">
+        {/* First row - Title and stats */}
+        <div className="px-6 py-2 flex items-center justify-between border-b border-gray-100">
+          <div className="flex items-center gap-4">
+            <h2 className="text-lg font-semibold text-gray-900">Writing</h2>
+            <WritingStats editor={editor} />
           </div>
-        )}
-      </div>
-
-      {/* Remembrance Agent Panel */}
-      {showRemembranceAgent && (
-        <div className="border-t border-gray-200 p-4 bg-blue-50">
-          <div className="flex items-center space-x-2 mb-3">
-            <Search className="w-4 h-4 text-blue-600" />
-            <h4 className="text-sm font-medium text-blue-900">Relevant Analysis</h4>
-          </div>
-          <div className="space-y-2">
-            {/* TODO: Load relevant analysis from context */}
-            <p className="text-sm text-gray-600">
-              No relevant analysis found yet. Start analyzing data in the notebook to see suggestions here.
-            </p>
+          
+          {/* Save status */}
+          <div className="text-sm text-gray-500">
+            {isSaving && 'Saving...'}
+            {!isSaving && lastSaved && (
+              <span>Saved {formatTimeAgo(lastSaved)}</span>
+            )}
+            {!isSaving && !lastSaved && content !== initialContent && 'Unsaved changes'}
           </div>
         </div>
-      )}
 
-      {/* Alternative Analysis Panel */}
-      {showAlternativeAnalysis && (
-        <div className="border-t border-gray-200 p-4 bg-amber-50">
-          <div className="flex items-center space-x-2 mb-3">
-            <Lightbulb className="w-4 h-4 text-amber-600" />
-            <h4 className="text-sm font-medium text-amber-900">Suggested Analysis</h4>
-          </div>
-          <div className="space-y-2">
-            {/* TODO: Generate analysis suggestions based on writing context */}
-            <p className="text-sm text-gray-600">
-              Start writing about your data to get analysis suggestions.
-            </p>
+        {/* Second row - Action buttons */}
+        <div className="px-6 py-2 flex items-center gap-2">
+          {/* Manual save button */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={manualSave}
+            disabled={isSaving}
+          >
+            <Save className="w-4 h-4 mr-1.5" />
+            Save
+          </Button>
+
+          {/* View Relevant Analysis button */}
+          <Button
+            variant="default"
+            size="sm"
+            onClick={() => {
+              console.log('View Relevant Analysis clicked');
+            }}
+          >
+            <Eye className="w-4 h-4 mr-1.5" />
+            View Analysis
+          </Button>
+
+          {/* Suggest Alternative Analysis button */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              console.log('Suggest Alternative Analysis clicked');
+            }}
+          >
+            <Lightbulb className="w-4 h-4 mr-1.5" />
+            Suggest Analysis
+          </Button>
+        </div>
+      </div>
+
+      {/* Formatting toolbar */}
+      <div className="flex-shrink-0">
+        <WritingToolbar editor={editor} />
+      </div>
+
+      {/* Editor content */}
+      <div className="flex-1 overflow-y-auto bg-gray-50">
+        <div className="w-full max-w-[1200px] mx-auto py-12 px-8">
+          <div className="bg-white shadow-sm rounded-lg border border-gray-200 min-h-[600px]">
+            <EditorContent editor={editor} />
           </div>
         </div>
-      )}
+      </div>
     </div>
   );
+}
+
+// Helper function to format time ago
+function formatTimeAgo(date: Date): string {
+  const seconds = Math.floor((new Date().getTime() - date.getTime()) / 1000);
+  
+  if (seconds < 10) return 'just now';
+  if (seconds < 60) return `${seconds} seconds ago`;
+  if (seconds < 120) return '1 minute ago';
+  if (seconds < 3600) return `${Math.floor(seconds / 60)} minutes ago`;
+  if (seconds < 7200) return '1 hour ago';
+  return `${Math.floor(seconds / 3600)} hours ago`;
 }
