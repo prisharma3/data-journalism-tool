@@ -18,6 +18,7 @@ interface InsightCardProps {
     content: string;
     tagId: string;
     hypothesisTags?: string[];
+    plotThumbnail?: string;
     createdAt: Date;
   };
   tag?: Tag;
@@ -268,21 +269,38 @@ const PRESET_COLORS = [
         </div>
       )}
 
-      {/* Content */}
-      {isEditing ? (
-        <textarea
-          value={editContent}
-          onChange={(e) => setEditContent(e.target.value)}
-          placeholder="Write your insight..."
-          className="w-full p-2 text-sm rounded border border-gray-300 focus:outline-none focus:ring-2 resize-none bg-white"
-          rows={4}
-          autoFocus
-        />
-      ) : (
-        <p className="text-sm text-gray-800 whitespace-pre-wrap">
-          {insight.content}
-        </p>
-      )}
+{/* Content area with thumbnail and text side by side */}
+<div className="flex gap-3 items-start">
+  {/* Plot Thumbnail - Left side */}
+  {insight.plotThumbnail && (
+    <div className="flex-shrink-0">
+      <img
+        src={insight.plotThumbnail}
+        alt="Analysis plot"
+        className="w-20 h-20 object-contain rounded border"
+        style={{ borderColor: currentTag?.color || '#ccc' }}
+      />
+    </div>
+  )}
+
+  {/* Content - Right side */}
+  <div className="flex-1 min-w-0">
+    {isEditing ? (
+      <textarea
+        value={editContent}
+        onChange={(e) => setEditContent(e.target.value)}
+        placeholder="Write your insight..."
+        className="w-full p-2 text-sm rounded border border-gray-300 focus:outline-none focus:ring-2 resize-none bg-white"
+        rows={4}
+        autoFocus
+      />
+    ) : (
+      <p className="text-sm text-gray-800 whitespace-pre-wrap break-words overflow-wrap-anywhere">
+        {insight.content}
+      </p>
+    )}
+  </div>
+</div>
 
       {/* Hypothesis Tags */}
       {hypotheses.length > 0 && (

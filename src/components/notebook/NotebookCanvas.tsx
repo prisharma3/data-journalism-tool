@@ -1,6 +1,6 @@
 'use client';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 
-import { useState, useEffect, useCallback } from 'react';
 import { Plus, Play, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import CodeCell from './CodeCell';
@@ -58,6 +58,7 @@ interface NotebookState {
     executionCount?: number;
     isRunning?: boolean;
     isGenerating?: boolean;
+    hypothesisTags?: string[];
   }
 
 interface Hypothesis {
@@ -78,6 +79,7 @@ interface Hypothesis {
     content: string;
     tagId: string;
     hypothesisTags?: string[]; // Array of hypothesis IDs
+    plotThumbnail?: string;
     createdAt: Date;
   }
 
@@ -141,6 +143,56 @@ const insightsScrollRef = useRef<HTMLDivElement>(null);
 // Collapse state for sections
 const [isDatasetCollapsed, setIsDatasetCollapsed] = useState(false);
 const [isHypothesesCollapsed, setIsHypothesesCollapsed] = useState(false);
+
+// Filter state for notebook cells
+const [notebookHypothesisFilter, setNotebookHypothesisFilter] = useState<string[]>([]);
+const [showNotebookFilter, setShowNotebookFilter] = useState(false);
+
+// Filter cells based on selected hypothesis filter
+const filteredCells = useMemo(() => {
+    if (notebookHypothesisFilter.length === 0) {
+      return notebookState.cells;
+    }
+    
+    return notebookState.cells.filter(cell => 
+      cell.hypothesisTags?.some(tag => notebookHypothesisFilter.includes(tag))
+    );
+  }, [notebookState.cells, notebookHypothesisFilter]);
+
+// Filter states for insights panel
+const [insightFilters, setInsightFilters] = useState<{
+    hypotheses: string[];
+    tags: string[];
+  }>({
+    hypotheses: [],
+    tags: [],
+  });
+  const [showInsightFilters, setShowInsightFilters] = useState(false);
+  const [insightFilterSections, setInsightFilterSections] = useState({
+    hypotheses: true,
+    tags: true,
+  }); // ADD THIS IF IT'S MISSING
+
+  // Filter insights based on selected filters
+const filteredInsights = useMemo(() => {
+    let filtered = notebookState.insights;
+    
+    // Filter by hypotheses
+    if (insightFilters.hypotheses.length > 0) {
+      filtered = filtered.filter(insight => 
+        insight.hypothesisTags?.some(tag => insightFilters.hypotheses.includes(tag))
+      );
+    }
+    
+    // Filter by tags
+    if (insightFilters.tags.length > 0) {
+      filtered = filtered.filter(insight => 
+        insightFilters.tags.includes(insight.tagId)
+      );
+    }
+    
+    return filtered;
+  }, [notebookState.insights, insightFilters]);
 
   // Add this helper function to scroll to a cell
 const scrollToCell = useCallback((cellId: string) => {
@@ -237,6 +289,7 @@ useEffect(() => {
       onSectionsChange(sections);
     }
 }, [notebookState.dataset, notebookState.hypotheses, notebookState.cells, notebookState.insights, notebookState.tags]);
+
 
   // Load cells from API or store
   useEffect(() => {
@@ -670,12 +723,18 @@ const handleUpdateInsight = useCallback((insightId: string, content: string, tag
 
 // Handle opening insight - create blank insight in edit mode in panel
 const handleOpenInsightModal = useCallback((cellId: string) => {
+
+  // Find the cell to get its plot output
+  const cell = notebookState.cells.find(c => c.id === cellId);
+  const plotThumbnail = cell?.output?.plot || undefined;
+
     const newInsight: Insight = {
       id: `insight-${Date.now()}`,
       cellId,
       content: '',
       tagId: '', // Empty tagId means it's in "new/edit" mode
       hypothesisTags: [],
+      plotThumbnail,
       createdAt: new Date(),
     };
     
@@ -683,7 +742,7 @@ const handleOpenInsightModal = useCallback((cellId: string) => {
       ...prev,
       insights: [newInsight, ...prev.insights], // Add at the beginning
     }));
-  }, []);
+  },  [notebookState.cells]);
   
   // Handle closing insight modal
   const handleCloseInsightModal = useCallback(() => {
@@ -693,13 +752,16 @@ const handleOpenInsightModal = useCallback((cellId: string) => {
 // Handle saving insight from modal
 const handleSaveInsight = useCallback((content: string, tagId: string, hypothesisTags: string[]) => {
     if (insightModal.cellId) {
-      // Create insight with hypothesis tags
+      const cell = notebookState.cells.find(c => c.id === insightModal.cellId);
+      const plotThumbnail = cell?.output?.plot || undefined;
+      
       const newInsight: Insight = {
         id: `insight-${Date.now()}`,
         cellId: insightModal.cellId,
         content,
         tagId,
         hypothesisTags,
+        plotThumbnail, // ADD THIS LINE
         createdAt: new Date(),
       };
     
@@ -710,7 +772,7 @@ const handleSaveInsight = useCallback((content: string, tagId: string, hypothesi
       
       handleCloseInsightModal();
     }
-  }, [insightModal.cellId, handleCloseInsightModal]);
+  }, [insightModal.cellId, notebookState.cells, handleCloseInsightModal]);
 
   // Listen for minimap section clicks
 useEffect(() => {
@@ -735,6 +797,7 @@ useEffect(() => {
     window.addEventListener('highlight-section', handleHighlight as EventListener);
     return () => window.removeEventListener('highlight-section', handleHighlight as EventListener);
   }, [notebookState.cells, notebookState.insights, selectCell]);
+  
 
   return (
 <div className="h-full flex flex-col bg-gray-50">
@@ -823,13 +886,100 @@ useEffect(() => {
   )}
 </div>
 
+{/* Hypothesis Filter for Notebook */}
+{notebookState.hypotheses.length > 0 && (
+  <div className="mb-4 bg-white border border-gray-300 rounded-lg p-3">
+    <div className="flex items-center justify-between">
+      <h3 className="text-sm font-semibold text-gray-700">Filter Code Cells</h3>
+      <button
+        onClick={() => setShowNotebookFilter(!showNotebookFilter)}
+        className="text-xs px-2 py-1 bg-white border border-gray-300 rounded hover:bg-gray-50 flex items-center gap-1"
+      >
+        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+        </svg>
+        Filter by Hypothesis
+        {notebookHypothesisFilter.length > 0 && (
+          <span className="bg-purple-600 text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px]">
+            {notebookHypothesisFilter.length}
+          </span>
+        )}
+      </button>
+    </div>
+
+    {showNotebookFilter && (
+      <div className="mt-3 p-3 bg-gray-50 border border-gray-200 rounded relative">
+        {/* Close button */}
+        <button
+          onClick={() => setShowNotebookFilter(false)}
+          className="absolute top-2 right-2 text-gray-400 hover:text-gray-600"
+          title="Close filter"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+
+        <p className="text-xs font-semibold text-gray-600 mb-2">Show cells linked to:</p>
+        <div className="space-y-1">
+          {notebookState.hypotheses.map((hyp, index) => (
+            <label key={hyp.id} className="flex items-center gap-2 text-xs cursor-pointer hover:bg-white p-1 rounded">
+              <input
+                type="checkbox"
+                checked={notebookHypothesisFilter.includes(hyp.id)}
+                onChange={(e) => {
+                  if (e.target.checked) {
+                    setNotebookHypothesisFilter(prev => [...prev, hyp.id]);
+                  } else {
+                    setNotebookHypothesisFilter(prev => prev.filter(id => id !== hyp.id));
+                  }
+                }}
+                className="rounded"
+              />
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium text-white bg-purple-600">
+                H{index + 1}
+              </span>
+              <span className="flex-1 truncate">{hyp.content.slice(0, 40)}...</span>
+            </label>
+          ))}
+        </div>
+
+        {notebookHypothesisFilter.length > 0 && (
+          <button
+            onClick={() => setNotebookHypothesisFilter([])}
+            className="mt-2 w-full text-xs px-2 py-1 bg-gray-200 hover:bg-gray-300 rounded"
+          >
+            Clear Filter
+          </button>
+        )}
+      </div>
+    )}
+
+    {notebookHypothesisFilter.length > 0 && (
+      <p className="text-xs text-gray-500 mt-2">
+        Showing {filteredCells.length} of {notebookState.cells.length} code cells
+      </p>
+    )}
+  </div>
+)}
+
 {notebookState.cells.length === 0 ? (
   <div className="text-center py-20 text-gray-500">
     <Plus size={48} className="mx-auto mb-4 opacity-30" />
     <p>No cells yet. Click "Add Cell" to start coding!</p>
   </div>
+) : filteredCells.length === 0 ? (
+  <div className="text-center py-20 text-gray-500">
+    <p>No cells match the selected hypothesis filter.</p>
+    <button
+      onClick={() => setNotebookHypothesisFilter([])}
+      className="mt-2 text-sm text-blue-600 hover:underline"
+    >
+      Clear filter to see all cells
+    </button>
+  </div>
 ) : (
-    notebookState.cells.map((cell, index) => (
+  filteredCells.map((cell, index) => (
         <div 
           key={`${cell.id}-${index}`}
           id={`section-${cell.id}`}
@@ -854,7 +1004,7 @@ useEffect(() => {
             onUpdateHypothesisTags={handleUpdateCellHypothesisTags}
             hypotheses={notebookState.hypotheses}
             canMoveUp={index > 0}
-            canMoveDown={index < notebookState.cells.length - 1}
+            canMoveDown={index < filteredCells.length - 1}
             datasetInfo={notebookState.dataset?.summary}
           />
         </div>
@@ -868,47 +1018,195 @@ ref={insightsScrollRef}
 className="bg-gray-100 border-l border-gray-300 overflow-y-auto p-4"
 style={{ width: '400px', minWidth: '350px', flexShrink: 0 }}
 >
-        <div className="sticky top-0 mb-4 pb-2 bg-gray-100 z-10 border-b border-gray-300">
-          <h3 className="text-sm font-semibold text-gray-700">Insights</h3>
-          <p className="text-xs text-gray-500 mt-1">
-            {notebookState.insights.length} insight{notebookState.insights.length !== 1 ? 's' : ''}
-          </p>
-        </div>
-
-        {/* Insights List */}
-        <div className="space-y-3">
-        {notebookState.insights.length === 0 ? (
-  <p className="text-sm text-gray-500 text-center py-8">
-    No insights yet. Run code and click "+ Add Insight" to create insights.
+<div className="sticky top-0 mb-4 pb-2 bg-gray-100 z-10 border-b border-gray-300">
+  <div className="flex items-center justify-between mb-2">
+    <h3 className="text-sm font-semibold text-gray-700">Insights</h3>
+    <button
+      onClick={() => setShowInsightFilters(!showInsightFilters)}
+      className="text-xs px-2 py-1 bg-white border border-gray-300 rounded hover:bg-gray-50 flex items-center gap-1"
+    >
+      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+      </svg>
+      Filter
+      {(insightFilters.hypotheses.length > 0 || insightFilters.tags.length > 0) && (
+        <span className="bg-blue-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px]">
+          {insightFilters.hypotheses.length + insightFilters.tags.length}
+        </span>
+      )}
+    </button>
+  </div>
+  
+  <p className="text-xs text-gray-500">
+    {filteredInsights.length} of {notebookState.insights.length} insight{notebookState.insights.length !== 1 ? 's' : ''}
   </p>
-) : (
-    notebookState.insights.map(insight => {
-        const tag = notebookState.tags.find(t => t.id === insight.tagId);
-        
-        return (
-          <div
-            key={insight.id}
-            id={`section-${insight.id}`}
-            ref={(el) => {
-              if (el) insightRefs.current.set(insight.id, el);
-            }}
+
+{/* Filter Dropdown */}
+{showInsightFilters && (
+  <div className="mt-2 pt-8 p-3 bg-white border border-gray-300 rounded shadow-sm relative">
+    {/* Close button */}
+    <button
+      onClick={() => setShowInsightFilters(false)}
+      className="absolute top-2 right-2 text-gray-400 hover:text-gray-600"
+      title="Close filters"
+    >
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+      </svg>
+    </button>
+
+    {/* Hypothesis Filters */}
+    {notebookState.hypotheses.length > 0 && (
+      <div className="mb-3">
+        <button
+          onClick={() => setInsightFilterSections(prev => ({ ...prev, hypotheses: !prev.hypotheses }))}
+          className="flex items-center justify-between w-full text-xs font-semibold text-gray-600 mb-2 hover:text-gray-800"
+        >
+          <span>Filter by Hypothesis:</span>
+          <svg
+            className={`w-3 h-3 transition-transform ${insightFilterSections.hypotheses ? 'rotate-180' : ''}`}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
           >
-            <InsightCard
-              insight={insight}
-              tag={tag}
-              onUpdate={handleUpdateInsight}
-              onDelete={handleDeleteInsight}
-              onAddTag={handleAddTag}
-              onClick={() => handleInsightClick(insight.id, insight.cellId)}
-              isHighlighted={highlightedInsightId === insight.id}
-              allTags={notebookState.tags}
-              hypotheses={notebookState.hypotheses}
-            />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+        
+        {insightFilterSections.hypotheses && (
+          <div className="space-y-1">
+            {notebookState.hypotheses.map((hyp, index) => (
+              <label key={hyp.id} className="flex items-center gap-2 text-xs cursor-pointer hover:bg-gray-50 p-1 rounded">
+                <input
+                  type="checkbox"
+                  checked={insightFilters.hypotheses.includes(hyp.id)}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      setInsightFilters(prev => ({
+                        ...prev,
+                        hypotheses: [...prev.hypotheses, hyp.id]
+                      }));
+                    } else {
+                      setInsightFilters(prev => ({
+                        ...prev,
+                        hypotheses: prev.hypotheses.filter(id => id !== hyp.id)
+                      }));
+                    }
+                  }}
+                  className="rounded"
+                />
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium text-white bg-purple-600">
+                  H{index + 1}
+                </span>
+                <span className="flex-1 truncate">{hyp.content.slice(0, 30)}...</span>
+              </label>
+            ))}
           </div>
-        );
-      })
+        )}
+      </div>
+    )}
+
+    {/* Tag Filters */}
+    {notebookState.tags.length > 0 && (
+      <div>
+        <button
+          onClick={() => setInsightFilterSections(prev => ({ ...prev, tags: !prev.tags }))}
+          className="flex items-center justify-between w-full text-xs font-semibold text-gray-600 mb-2 hover:text-gray-800"
+        >
+          <span>Filter by Tag:</span>
+          <svg
+            className={`w-3 h-3 transition-transform ${insightFilterSections.tags ? 'rotate-180' : ''}`}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+        
+        {insightFilterSections.tags && (
+          <div className="space-y-1">
+            {notebookState.tags.map((tag) => (
+              <label key={tag.id} className="flex items-center gap-2 text-xs cursor-pointer hover:bg-gray-50 p-1 rounded">
+                <input
+                  type="checkbox"
+                  checked={insightFilters.tags.includes(tag.id)}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      setInsightFilters(prev => ({
+                        ...prev,
+                        tags: [...prev.tags, tag.id]
+                      }));
+                    } else {
+                      setInsightFilters(prev => ({
+                        ...prev,
+                        tags: prev.tags.filter(id => id !== tag.id)
+                      }));
+                    }
+                  }}
+                  className="rounded"
+                />
+                <span 
+                  className="w-3 h-3 rounded-full"
+                  style={{ backgroundColor: tag.color }}
+                />
+                <span className="flex-1">{tag.name}</span>
+              </label>
+            ))}
+          </div>
+        )}
+      </div>
+    )}
+
+    {/* Clear Filters Button */}
+    {(insightFilters.hypotheses.length > 0 || insightFilters.tags.length > 0) && (
+      <button
+        onClick={() => setInsightFilters({ hypotheses: [], tags: [] })}
+        className="mt-2 w-full text-xs px-2 py-1 bg-gray-200 hover:bg-gray-300 rounded"
+      >
+        Clear All Filters
+      </button>
+    )}
+  </div>
 )}
+</div>
+
+ {/* Insights List */}
+<div className="space-y-3">
+  {filteredInsights.length === 0 ? (
+    <p className="text-sm text-gray-500 text-center py-8">
+      {notebookState.insights.length === 0 
+        ? "No insights yet. Run code and click \"+ Add Insight\" to create insights."
+        : "No insights match the current filters."}
+    </p>
+  ) : (
+    filteredInsights.map((insight) => {
+      const tag = notebookState.tags.find(t => t.id === insight.tagId);
+      
+      return (
+        <div
+          key={insight.id}
+          id={`section-${insight.id}`}
+          ref={(el) => {
+            if (el) insightRefs.current.set(insight.id, el);
+          }}
+        >
+          <InsightCard
+            insight={insight}
+            tag={tag}
+            onUpdate={handleUpdateInsight}
+            onDelete={handleDeleteInsight}
+            onAddTag={handleAddTag}
+            onClick={() => handleInsightClick(insight.id, insight.cellId)}
+            isHighlighted={highlightedInsightId === insight.id}
+            allTags={notebookState.tags}
+            hypotheses={notebookState.hypotheses}
+          />
         </div>
+      );
+    })
+  )}
+</div>
       </div>
 </div>
 </div>
