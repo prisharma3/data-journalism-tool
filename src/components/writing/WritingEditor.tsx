@@ -31,6 +31,24 @@ export default function WritingEditor({ projectId, initialContent = '' }: Writin
         heading: {
           levels: [1, 2, 3],
         },
+        bulletList: {
+          keepMarks: true,
+          keepAttributes: false,
+        },
+        orderedList: {
+          keepMarks: true,
+          keepAttributes: false,
+        },
+        blockquote: {
+          HTMLAttributes: {
+            class: 'border-l-4 border-gray-300 pl-4 italic',
+          },
+        },
+        code: {
+          HTMLAttributes: {
+            class: 'bg-gray-100 rounded px-1 py-0.5 font-mono text-sm',
+          },
+        },
       }),
       Placeholder.configure({
         placeholder: 'Start writing your data journalism article...',
