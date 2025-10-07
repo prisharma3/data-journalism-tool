@@ -14,6 +14,15 @@ export function generateToken(userId: string): string {
   return jwt.sign({ userId }, process.env.JWT_SECRET!, { expiresIn: '7d' });
 }
 
+export function verifyToken(token: string): { userId: string } | null {
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET!) as { userId: string };
+      return decoded;
+    } catch (error) {
+      return null;
+    }
+  }
+
 export async function getUserByEmail(email: string) {
   const result = await query('SELECT * FROM users WHERE email = $1', [email]);
   return result.rows[0] || null;
