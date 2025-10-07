@@ -4,7 +4,6 @@ import { useState, useRef } from 'react';
 import Editor from '@monaco-editor/react';
 import { Play, Trash2, Plus, ChevronUp, ChevronDown, Check, X, Loader, Sparkles, Edit2 } from 'lucide-react';
 import HypothesisTagSelector from './HypothesisTagSelector';
-import InsightSticky from './InsightSticky';
 
 interface CodeCellProps {
     cell: {
@@ -24,7 +23,7 @@ interface CodeCellProps {
       isGenerating?: boolean;
     };
     isSelected: boolean;
-    isHighlighted?: boolean;
+    isHighlighted?: boolean; // ADD THIS LINE
     onExecute: (id: string) => void;
     onDelete: (id: string) => void;
     onUpdate: (id: string, content: string) => void;
@@ -35,21 +34,8 @@ interface CodeCellProps {
     onMoveDown?: (id: string) => void;
     onGenerateCode?: (id: string, query: string) => void;
     onAddInsight?: (cellId: string) => void;
-    onAddTag?: (name: string, color: string) => string;
     onUpdateHypothesisTags?: (cellId: string, tags: string[]) => void;
     hypotheses?: Array<{ id: string; content: string; createdAt: Date }>;
-    // ADD THESE NEW PROPS:
-    insights?: Array<{
-      id: string;
-      cellId: string;
-      content: string;
-      tagId: string;
-      hypothesisTags?: string[];
-      createdAt: Date;
-    }>;
-    tags?: Array<{ id: string; name: string; color: string }>;
-    onUpdateInsight?: (insightId: string, content: string, tagId: string, hypothesisTags?: string[]) => void;
-    onDeleteInsight?: (insightId: string) => void;
     canMoveUp: boolean;
     canMoveDown: boolean;
     datasetInfo?: any;
@@ -58,7 +44,7 @@ interface CodeCellProps {
   export default function CodeCell({
     cell,
     isSelected,
-    isHighlighted = false,
+    isHighlighted = false, // ADD THIS LINE
     onExecute,
     onDelete,
     onUpdate,
@@ -80,6 +66,9 @@ interface CodeCellProps {
     canMoveDown,
     datasetInfo,
   }: CodeCellProps) {
+    const [isOutputCollapsed, setIsOutputCollapsed] = useState(false);
+    const [isCellCollapsed, setIsCellCollapsed] = useState(false);
+    
   const [isHovered, setIsHovered] = useState(false);
   const [showQueryInput, setShowQueryInput] = useState(!cell.content && !cell.query);
   const [queryText, setQueryText] = useState(cell.query || '');
@@ -131,116 +120,142 @@ interface CodeCellProps {
     boxShadow: isHighlighted ? '0 0 0 3px rgba(251, 191, 36, 0.3)' : 'none',
   }}
 >
-      {/* Cell Toolbar */}
-      <div
-        className="flex items-center justify-between px-2 py-1 bg-gray-50 border-b border-gray-200 transition-opacity"
-        style={{
-          opacity: isHovered || isSelected ? 1 : 0.3,
+{/* Cell Toolbar */}
+<div
+  className="flex items-center justify-between px-2 py-1 bg-gray-50 border-b border-gray-200 transition-opacity"
+  style={{
+    opacity: isHovered || isSelected ? 1 : 0.3,
+  }}
+>
+  <div className="flex items-center gap-2">
+    {/* Execution Count */}
+    <div className="min-w-[40px] text-xs text-gray-600 font-mono">
+      {cell.executionCount ? `[${cell.executionCount}]:` : '[ ]:'}
+    </div>
+
+    {/* Execution Status */}
+    {cell.isRunning && <Loader size={14} className="animate-spin text-blue-500" />}
+    {cell.isGenerating && <Loader size={14} className="animate-spin text-purple-500" />}
+    {cell.output && !cell.isRunning && !cell.error && <Check size={14} className="text-green-500" />}
+    {cell.error && <X size={14} className="text-red-500" />}
+  </div>
+
+  {/* Action Buttons */}
+  <div className="flex gap-1">
+    {/* Collapse Buttons */}
+    <button
+      onClick={(e) => {
+        e.stopPropagation();
+        setIsOutputCollapsed(!isOutputCollapsed);
+      }}
+      className="px-2 py-1 bg-gray-400 text-white rounded text-xs hover:bg-gray-500 flex items-center gap-1"
+      title={isOutputCollapsed ? "Show output" : "Hide output"}
+    >
+      {isOutputCollapsed ? '▶' : '▼'} Output
+    </button>
+
+    <button
+      onClick={(e) => {
+        e.stopPropagation();
+        setIsCellCollapsed(!isCellCollapsed);
+        if (!isCellCollapsed) {
+          setIsOutputCollapsed(false);
+        }
+      }}
+      className="px-2 py-1 bg-gray-400 text-white rounded text-xs hover:bg-gray-500 flex items-center gap-1"
+      title={isCellCollapsed ? "Expand cell" : "Collapse cell"}
+    >
+      {isCellCollapsed ? '▶' : '▼'} Code
+    </button>
+
+    <button
+      onClick={(e) => {
+        e.stopPropagation();
+        onExecute(cell.id);
+      }}
+      title="Run Cell (Shift+Enter)"
+      className="px-2 py-1 bg-green-500 text-white rounded text-xs hover:bg-green-600 flex items-center"
+      disabled={cell.isRunning || cell.isGenerating}
+    >
+      <Play size={12} />
+    </button>
+
+    {cell.query && !showQueryInput && (
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          handleEditQuery();
         }}
+        title="Edit Query"
+        className="px-2 py-1 bg-purple-500 text-white rounded text-xs hover:bg-purple-600 flex items-center"
+        disabled={cell.isGenerating}
       >
-        <div className="flex items-center gap-2">
-          {/* Execution Count */}
-          <div className="min-w-[40px] text-xs text-gray-600 font-mono">
-            {cell.executionCount ? `[${cell.executionCount}]:` : '[ ]:'}
-          </div>
+        <Edit2 size={12} />
+      </button>
+    )}
 
-          {/* Execution Status */}
-          {cell.isRunning && <Loader size={14} className="animate-spin text-blue-500" />}
-          {cell.isGenerating && <Loader size={14} className="animate-spin text-purple-500" />}
-          {cell.output && !cell.isRunning && !cell.error && <Check size={14} className="text-green-500" />}
-          {cell.error && <X size={14} className="text-red-500" />}
-        </div>
+    <button
+      onClick={(e) => {
+        e.stopPropagation();
+        onAddAbove(cell.id);
+      }}
+      title="Add Cell Above"
+      className="px-2 py-1 bg-blue-500 text-white rounded text-xs hover:bg-blue-600"
+    >
+      <Plus size={12} />↑
+    </button>
 
-        {/* Action Buttons */}
-        <div className="flex gap-1">
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onExecute(cell.id);
-            }}
-            title="Run Cell (Shift+Enter)"
-            className="px-2 py-1 bg-green-500 text-white rounded text-xs hover:bg-green-600 flex items-center"
-            disabled={cell.isRunning || cell.isGenerating}
-          >
-            <Play size={12} />
-          </button>
+    <button
+      onClick={(e) => {
+        e.stopPropagation();
+        onAddBelow(cell.id);
+      }}
+      title="Add Cell Below"
+      className="px-2 py-1 bg-blue-500 text-white rounded text-xs hover:bg-blue-600"
+    >
+      <Plus size={12} />↓
+    </button>
 
-          {cell.query && !showQueryInput && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handleEditQuery();
-              }}
-              title="Edit Query"
-              className="px-2 py-1 bg-purple-500 text-white rounded text-xs hover:bg-purple-600 flex items-center"
-              disabled={cell.isGenerating}
-            >
-              <Edit2 size={12} />
-            </button>
-          )}
+    {canMoveUp && (
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          onMoveUp?.(cell.id);
+        }}
+        title="Move Up"
+        className="px-2 py-1 bg-gray-500 text-white rounded text-xs hover:bg-gray-600"
+      >
+        <ChevronUp size={12} />
+      </button>
+    )}
 
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onAddAbove(cell.id);
-            }}
-            title="Add Cell Above"
-            className="px-2 py-1 bg-blue-500 text-white rounded text-xs hover:bg-blue-600"
-          >
-            <Plus size={12} />↑
-          </button>
+    {canMoveDown && (
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          onMoveDown?.(cell.id);
+        }}
+        title="Move Down"
+        className="px-2 py-1 bg-gray-500 text-white rounded text-xs hover:bg-gray-600"
+      >
+        <ChevronDown size={12} />
+      </button>
+    )}
 
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onAddBelow(cell.id);
-            }}
-            title="Add Cell Below"
-            className="px-2 py-1 bg-blue-500 text-white rounded text-xs hover:bg-blue-600"
-          >
-            <Plus size={12} />↓
-          </button>
-
-          {canMoveUp && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onMoveUp?.(cell.id);
-              }}
-              title="Move Up"
-              className="px-2 py-1 bg-gray-500 text-white rounded text-xs hover:bg-gray-600"
-            >
-              <ChevronUp size={12} />
-            </button>
-          )}
-
-          {canMoveDown && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onMoveDown?.(cell.id);
-              }}
-              title="Move Down"
-              className="px-2 py-1 bg-gray-500 text-white rounded text-xs hover:bg-gray-600"
-            >
-              <ChevronDown size={12} />
-            </button>
-          )}
-
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              if (window.confirm('Delete this cell?')) {
-                onDelete(cell.id);
-              }
-            }}
-            title="Delete Cell"
-            className="px-2 py-1 bg-red-500 text-white rounded text-xs hover:bg-red-600"
-          >
-            <Trash2 size={12} />
-          </button>
-        </div>
-      </div>
+    <button
+      onClick={(e) => {
+        e.stopPropagation();
+        if (window.confirm('Delete this cell?')) {
+          onDelete(cell.id);
+        }
+      }}
+      title="Delete Cell"
+      className="px-2 py-1 bg-red-500 text-white rounded text-xs hover:bg-red-600"
+    >
+      <Trash2 size={12} />
+    </button>
+  </div>
+</div>
 
       {/* Query Input (shown when cell is new or editing query) */}
       {showQueryInput && (
@@ -305,7 +320,7 @@ interface CodeCellProps {
       )}
 
       {/* Code Editor */}
-      {cell.content && (
+      {!isCellCollapsed && cell.content && (
         <div onKeyDown={handleKeyDown}>
           <Editor
             height="120px"
@@ -341,73 +356,57 @@ interface CodeCellProps {
 )}
 
 {/* Output Display */}
-{(cell.output || cell.error) && (
-  <div className="relative" style={{ overflow: 'visible' }}>
-    <div
-      className="border-t border-gray-200 p-2 max-h-96"
-      style={{
-        backgroundColor: cell.error ? '#ffebee' : '#fafafa',
-        overflowY: 'auto',
-        overflowX: 'visible'
-      }}
-    >
-      {/* Add Insight Button - Top Right */}
-      {cell.output && !cell.error && onAddInsight && (
-        <div className="flex justify-end mb-2">
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onAddInsight(cell.id);
-            }}
-            className="flex items-center gap-1 px-3 py-1.5 bg-blue-500 text-white rounded text-xs hover:bg-blue-600 transition-colors shadow-sm"
-            title="Add Insight"
-          >
-            <Plus size={14} />
-            Add Insight
-          </button>
-        </div>
-      )}
-      
-      {cell.error && (
-        <div className="text-red-700 font-mono text-xs">
-          <strong>Error:</strong>
-          <pre className="mt-1 whitespace-pre-wrap">{cell.error}</pre>
-        </div>
-      )}
+{!isOutputCollapsed && (cell.output || cell.error) && (
+  <div
+    className="border-t border-gray-200 p-2 max-h-96 overflow-auto"
+    style={{
+      backgroundColor: cell.error ? '#ffebee' : '#fafafa',
+    }}
+  >
+    {/* Add Insight Button - Top Right */}
+    {cell.output && !cell.error && onAddInsight && (
+      <div className="flex justify-end mb-2">
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onAddInsight(cell.id);
+          }}
+          className="flex items-center gap-1 px-3 py-1.5 bg-blue-500 text-white rounded text-xs hover:bg-blue-600 transition-colors shadow-sm"
+          title="Add Insight"
+        >
+          <Plus size={14} />
+          Add Insight
+        </button>
+      </div>
+    )}
+    
+    {cell.error && (
+      <div className="text-red-700 font-mono text-xs">
+        <strong>Error:</strong>
+        <pre className="mt-1 whitespace-pre-wrap">{cell.error}</pre>
+      </div>
+    )}
 
-      {cell.output?.text && (
-        <div className="font-mono text-xs">
-          <pre className="m-0 whitespace-pre-wrap">{cell.output.text}</pre>
-        </div>
-      )}
+    {cell.output?.text && (
+      <div className="font-mono text-xs">
+        <pre className="m-0 whitespace-pre-wrap">{cell.output.text}</pre>
+      </div>
+    )}
 
-      {cell.output?.plot && (
-        <div className="mt-2">
-          <img
-            src={cell.output.plot}
-            alt="Plot output"
-            className="max-w-full h-auto rounded"
-          />
-        </div>
-      )}
+    {cell.output?.plot && (
+      <div className="mt-2">
+        <img
+          src={cell.output.plot}
+          alt="Plot output"
+          className="max-w-full h-auto rounded"
+        />
+      </div>
+    )}
 
-      {cell.output?.executionTime && (
-        <div className="text-[10px] text-gray-600 mt-1 italic">
-          Execution time: {cell.output.executionTime}ms
-        </div>
-      )}
-    </div>
-
-    {/* Insight Stickies - positioned at right edge OUTSIDE the scrollable div */}
-    {insights && tags && onUpdateInsight && onDeleteInsight && (
-      <InsightSticky
-        insights={insights.filter(i => i.cellId === cell.id)}
-        tags={tags}
-        hypotheses={hypotheses || []}
-        onUpdate={onUpdateInsight}
-        onDelete={onDeleteInsight}
-        onAddTag={onAddTag}
-      />
+    {cell.output?.executionTime && (
+      <div className="text-[10px] text-gray-600 mt-1 italic">
+        Execution time: {cell.output.executionTime}ms
+      </div>
     )}
   </div>
 )}

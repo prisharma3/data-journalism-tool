@@ -46,6 +46,9 @@ export default function AddInsightModal({
     const [newTagColor, setNewTagColor] = useState(PRESET_COLORS[0]);   
     const [selectedHypothesisTags, setSelectedHypothesisTags] = useState<string[]>([]);
 
+    const [isOutputCollapsed, setIsOutputCollapsed] = useState(false);
+const [isCellCollapsed, setIsCellCollapsed] = useState(false);
+
 
   if (!isOpen) return null;
 

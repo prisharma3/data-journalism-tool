@@ -81,7 +81,9 @@ export default function DatasetSection({
   };
 
   return (
-    <div className="mb-4 p-4 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+    // <div className="mb-4 p-4 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+        <div className="mb-4 p-4 bg-gray-50 rounded-lg">
+
       <div className="flex items-center justify-between mb-2">
         <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
           <FileText size={16} />

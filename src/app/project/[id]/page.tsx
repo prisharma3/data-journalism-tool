@@ -17,7 +17,7 @@ export default function NotebookPage() {
   const [projectId] = useState(params.id as string);
   
   // Resizable panels state
-  const [minimapWidth, setMinimapWidth] = useState(180); // Decreased from 256px
+  const [minimapWidth, setMinimapWidth] = useState(45); // Decreased from 256px
   const [writingWidth, setWritingWidth] = useState(384); // 96 * 4 = 384px
   const [isDraggingLeft, setIsDraggingLeft] = useState(false);
   const [isDraggingRight, setIsDraggingRight] = useState(false);
@@ -40,8 +40,8 @@ export default function NotebookPage() {
         const newWidth = e.clientX - containerRect.left;
         
         // Min 150px, Max 400px for minimap
-        if (newWidth >= 150 && newWidth <= 400) {
-          setMinimapWidth(newWidth);
+        if (newWidth >= 50 && newWidth <= 150) {
+            setMinimapWidth(newWidth);
         }
       }
     };

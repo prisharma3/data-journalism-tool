@@ -81,7 +81,7 @@ export default function HypothesisSection({
     <div className="mb-4">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <h3 className="text-sm font-semibold text-purple-900">Research Hypotheses</h3>
+          {/* <h3 className="text-sm font-semibold text-purple-900">Research Hypotheses</h3> */}
           {isSaving && (
             <span className="text-xs text-purple-600 flex items-center gap-1">
               <Save size={12} className="animate-pulse" />
@@ -95,33 +95,36 @@ export default function HypothesisSection({
             </span>
           )}
         </div>
-        <Button
-          onClick={addHypothesis}
-          size="sm"
-          variant="outline"
-          className="text-purple-700 border-purple-300 hover:bg-purple-50"
-        >
-          <Plus size={14} className="mr-1" />
-          Add Hypothesis
-        </Button>
       </div>
-
+  
+      {/* Moved button here, outside the flex container */}
+      <Button
+  onClick={addHypothesis}
+  size="sm"
+  variant="outline"
+  className="ml-4 mb-3 text-purple-700 border-purple-300 hover:bg-purple-50"
+>
+  <Plus size={14} className="mr-0.5" />
+  Add Hypothesis
+</Button>
+  
       {hypotheses.length === 0 ? (
         <div 
-          className="p-6 rounded-lg border-2 border-dashed text-center"
-          style={{ backgroundColor: '#F3E5F5', borderColor: '#CE93D8' }}
+        //   className="p-6 rounded-lg border-2 border-dashed text-center"
+                    className="text-center"
+        //   style={{ backgroundColor: '#F3E5F5', borderColor: '#CE93D8' }}
         >
           <p className="text-sm text-purple-700 mb-3">
             No hypotheses yet. Add your first research hypothesis to begin.
           </p>
-          <Button
+          {/* <Button
             onClick={addHypothesis}
             size="sm"
             className="bg-purple-600 hover:bg-purple-700"
           >
             <Plus size={14} className="mr-1" />
             Add First Hypothesis
-          </Button>
+          </Button> */}
         </div>
       ) : (
         <div className="space-y-3">
@@ -157,7 +160,7 @@ export default function HypothesisSection({
                     style={{ minHeight: '80px' }}
                   />
                 </div>
-
+  
                 <Button
                   onClick={() => deleteHypothesis(hypothesis.id)}
                   size="sm"

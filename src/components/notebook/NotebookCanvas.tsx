@@ -7,12 +7,21 @@ import CodeCell from './CodeCell';
 import DatasetSection from './DatasetSection';
 import HypothesisSection from './HypothesisSection';
 import InsightCard from './InsightCard';
-import AddInsightModal from './AddInsightModal';
 import { useRef } from 'react';
 
 interface NotebookCanvasProps {
-  projectId: string;
-}
+    projectId: string;
+    onSectionsChange?: (sections: MinimapSection[]) => void;
+  }
+  
+  export interface MinimapSection {
+    id: string;
+    type: 'dataset' | 'hypothesis' | 'analysis' | 'insight';
+    title: string;
+    color: string;
+    position: number;
+    height: number;
+  }
 
 interface NotebookState {
     cells: CodeCellType[];
@@ -93,7 +102,8 @@ interface Hypothesis {
     tags: Tag[];
   }
 
-export default function NotebookCanvas({ projectId }: NotebookCanvasProps) {
+  export default function NotebookCanvas({ projectId, onSectionsChange }: NotebookCanvasProps) {
+
     const [notebookState, setNotebookState] = useState<NotebookState>({
         cells: [],
         selectedCellId: undefined,
@@ -118,10 +128,19 @@ export default function NotebookCanvas({ projectId }: NotebookCanvasProps) {
         cellId: null,
       });
 
-  const [highlightedCellId, setHighlightedCellId] = useState<string | null>(null);
-  const [highlightedInsightId, setHighlightedInsightId] = useState<string | null>(null);
-  const cellRefs = useRef<Map<string, HTMLDivElement>>(new Map());
-  const insightRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+// Highlight and scroll state
+const [highlightedCellId, setHighlightedCellId] = useState<string | null>(null);
+const [highlightedInsightId, setHighlightedInsightId] = useState<string | null>(null);
+
+// Refs to track DOM elements
+const cellRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+const insightRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+const notebookScrollRef = useRef<HTMLDivElement>(null);
+const insightsScrollRef = useRef<HTMLDivElement>(null);
+
+// Collapse state for sections
+const [isDatasetCollapsed, setIsDatasetCollapsed] = useState(false);
+const [isHypothesesCollapsed, setIsHypothesesCollapsed] = useState(false);
 
   // Add this helper function to scroll to a cell
 const scrollToCell = useCallback((cellId: string) => {
@@ -134,12 +153,90 @@ const scrollToCell = useCallback((cellId: string) => {
     }
   }, []);
   
-  // Add this handler for insight clicks
-  const handleInsightClick = useCallback((insightId: string, cellId: string) => {
-    scrollToCell(cellId);
-    setHighlightedInsightId(insightId);
-    setTimeout(() => setHighlightedInsightId(null), 2000);
-  }, [scrollToCell]);
+// Scroll to and highlight a code cell when insight is clicked
+const handleInsightClick = useCallback((insightId: string, cellId: string) => {
+    const cellElement = cellRefs.current.get(cellId);
+    if (cellElement && notebookScrollRef.current) {
+      cellElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setHighlightedCellId(cellId);
+      setHighlightedInsightId(insightId);
+      
+      // Clear highlights after 2 seconds
+      setTimeout(() => {
+        setHighlightedCellId(null);
+        setHighlightedInsightId(null);
+      }, 2000);
+    }
+  }, []);
+
+  // Generate minimap sections whenever notebook state changes
+useEffect(() => {
+    if (!onSectionsChange) return;
+  
+    const sections: MinimapSection[] = [];
+    let currentPosition = 0;
+    const baseHeight = 0.05; // Base height for each section
+  
+    // Dataset section
+    if (notebookState.dataset) {
+      sections.push({
+        id: 'dataset',
+        type: 'dataset',
+        title: notebookState.dataset.filename,
+        color: '#9E9E9E',
+        position: currentPosition,
+        height: baseHeight * 2,
+      });
+      currentPosition += baseHeight * 2;
+    }
+  
+    // Hypothesis sections
+    notebookState.hypotheses.forEach((hyp, index) => {
+      sections.push({
+        id: hyp.id,
+        type: 'hypothesis',
+        title: `H${index + 1}: ${hyp.content.substring(0, 30)}...`,
+        color: '#9C27B0',
+        position: currentPosition,
+        height: baseHeight * 1.5,
+      });
+      currentPosition += baseHeight * 1.5;
+    });
+  
+    // Code cells and insights
+    notebookState.cells.forEach((cell, index) => {
+      // Analysis section
+      sections.push({
+        id: cell.id,
+        type: 'analysis',
+        title: cell.query || `Cell ${index + 1}`,
+        color: '#2196F3',
+        position: currentPosition,
+        height: baseHeight,
+      });
+      currentPosition += baseHeight;
+  
+      // Insights for this cell
+      const cellInsights = notebookState.insights.filter(i => i.cellId === cell.id);
+      cellInsights.forEach(insight => {
+        const tag = notebookState.tags.find(t => t.id === insight.tagId);
+        sections.push({
+          id: insight.id,
+          type: 'insight',
+          title: insight.content.substring(0, 30) + '...',
+          color: tag?.color || '#4CAF50',
+          position: currentPosition,
+          height: baseHeight * 0.8,
+        });
+        currentPosition += baseHeight * 0.8;
+      });
+    });
+  
+    console.log('Generated minimap sections:', sections);
+    if (onSectionsChange) {
+      onSectionsChange(sections);
+    }
+}, [notebookState.dataset, notebookState.hypotheses, notebookState.cells, notebookState.insights, notebookState.tags]);
 
   // Load cells from API or store
   useEffect(() => {
@@ -370,8 +467,29 @@ const moveCell = useCallback((cellId: string, direction: 'up' | 'down') => {
 
   // Select cell
   const selectCell = useCallback((cellId: string) => {
-    setNotebookState(prev => ({ ...prev, selectedCellId: cellId }));
-  }, []);
+    setNotebookState(prev => ({
+      ...prev,
+      selectedCellId: cellId,
+    }));
+    
+    // Find insights for this cell and scroll to them
+    const cellInsights = notebookState.insights.filter(i => i.cellId === cellId);
+    if (cellInsights.length > 0 && insightsScrollRef.current) {
+      const firstInsight = cellInsights[0];
+      const insightElement = insightRefs.current.get(firstInsight.id);
+      
+      if (insightElement) {
+        insightElement.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        setHighlightedInsightId(firstInsight.id);
+        setHighlightedCellId(cellId);
+        
+        setTimeout(() => {
+          setHighlightedCellId(null);
+          setHighlightedInsightId(null);
+        }, 2000);
+      }
+    }
+  }, [notebookState.insights]);
 
 // Handle dataset upload
 const handleDatasetUpload = useCallback((filename: string, data: string, summary: any) => {
@@ -415,7 +533,6 @@ const handleHypothesesChange = useCallback((hypotheses: Hypothesis[]) => {
     }));
   }, []);
 
-  // Handle AI code generation
 // Handle AI code generation
 const handleGenerateCode = useCallback(async (cellId: string, query: string) => {
     // Mark cell as generating
@@ -538,24 +655,22 @@ const handleUpdateInsight = useCallback((insightId: string, content: string, tag
     return newTag.id;
   }, []);
 
-  // Handle opening insight modal
-// Handle opening insight modal - now creates insight directly in edit mode
+// Handle opening insight - create blank insight in edit mode in panel
 const handleOpenInsightModal = useCallback((cellId: string) => {
-    // Create a new blank insight in edit mode
     const newInsight: Insight = {
       id: `insight-${Date.now()}`,
       cellId,
       content: '',
-      tagId: notebookState.tags[0]?.id || 'tag-default', // Use first tag as default
+      tagId: '', // Empty tagId means it's in "new/edit" mode
       hypothesisTags: [],
       createdAt: new Date(),
     };
     
     setNotebookState(prev => ({
       ...prev,
-      insights: [...prev.insights, newInsight],
+      insights: [newInsight, ...prev.insights], // Add at the beginning
     }));
-  }, [notebookState.tags]);
+  }, []);
   
   // Handle closing insight modal
   const handleCloseInsightModal = useCallback(() => {
@@ -583,6 +698,30 @@ const handleSaveInsight = useCallback((content: string, tagId: string, hypothesi
       handleCloseInsightModal();
     }
   }, [insightModal.cellId, handleCloseInsightModal]);
+
+  // Listen for minimap section clicks
+useEffect(() => {
+    const handleHighlight = (e: CustomEvent) => {
+      const { sectionId } = e.detail;
+      
+      // Check if it's a cell
+      const cell = notebookState.cells.find(c => c.id === sectionId);
+      if (cell) {
+        selectCell(cell.id);
+        return;
+      }
+      
+      // Check if it's an insight
+      const insight = notebookState.insights.find(i => i.id === sectionId);
+      if (insight) {
+        setHighlightedInsightId(insight.id);
+        setTimeout(() => setHighlightedInsightId(null), 2000);
+      }
+    };
+    
+    window.addEventListener('highlight-section', handleHighlight as EventListener);
+    return () => window.removeEventListener('highlight-section', handleHighlight as EventListener);
+  }, [notebookState.cells, notebookState.insights, selectCell]);
 
   return (
 <div className="h-full flex flex-col bg-gray-50">
@@ -622,19 +761,54 @@ const handleSaveInsight = useCallback((content: string, tagId: string, hypothesi
 {/* Two Column Layout: Notebook + Insights */}
 <div className="flex-1 flex overflow-hidden">
 {/* Left Column: Notebook Content */}
-<div className="flex-1 overflow-y-auto p-4 pr-16" style={{ maxWidth: '80%' }}>
-    {/* Dataset Upload Section */}
-    <DatasetSection
-      dataset={notebookState.dataset}
-      onDatasetUpload={handleDatasetUpload}
-      onDatasetRemove={handleDatasetRemove}
-    />
+<div ref={notebookScrollRef} className="flex-1 overflow-y-auto p-4">
 
-    {/* Hypothesis Section */}
-    <HypothesisSection
-      hypotheses={notebookState.hypotheses}
-      onHypothesesChange={handleHypothesesChange}
-    />
+{/* Dataset Upload Section */}
+<div id="section-dataset" className="mb-4">
+  <button
+    onClick={() => setIsDatasetCollapsed(!isDatasetCollapsed)}
+    className="w-full flex items-center justify-between p-2 bg-gray-100 hover:bg-gray-200 rounded-t border border-gray-300 transition-colors"
+  >
+    <span className="text-sm font-semibold text-gray-700">
+      Dataset {notebookState.dataset && `- ${notebookState.dataset.filename}`}
+    </span>
+    <span className="text-gray-600">
+      {isDatasetCollapsed ? '▼' : '▲'}
+    </span>
+  </button>
+  {!isDatasetCollapsed && (
+    <div className="border border-t-0 border-gray-300 rounded-b">
+      <DatasetSection
+        dataset={notebookState.dataset}
+        onDatasetUpload={handleDatasetUpload}
+        onDatasetRemove={handleDatasetRemove}
+      />
+    </div>
+  )}
+</div>
+
+{/* Hypothesis Section */}
+<div id="section-hypotheses" className="mb-4">
+  <button
+    onClick={() => setIsHypothesesCollapsed(!isHypothesesCollapsed)}
+    className="w-full flex items-center justify-between p-2 bg-purple-100 hover:bg-purple-200 rounded-t border border-purple-300 transition-colors"
+  >
+    <span className="text-sm font-semibold text-purple-700">
+      Research Hypotheses {notebookState.hypotheses.length > 0 && `(${notebookState.hypotheses.length})`}
+    </span>
+    <span className="text-purple-700">
+      {isHypothesesCollapsed ? '▼' : '▲'}
+    </span>
+  </button>
+  {!isHypothesesCollapsed && (
+    <div className="border border-t-0 border-purple-300 rounded-b">
+      <HypothesisSection
+        hypotheses={notebookState.hypotheses}
+        onHypothesesChange={handleHypothesesChange}
+      />
+    </div>
+  )}
+</div>
 
 {notebookState.cells.length === 0 ? (
   <div className="text-center py-20 text-gray-500">
@@ -643,43 +817,43 @@ const handleSaveInsight = useCallback((content: string, tagId: string, hypothesi
   </div>
 ) : (
     notebookState.cells.map((cell, index) => (
-<div key={`${cell.id}-${index}`} ref={(el) => {
-  if (el) cellRefs.current.set(cell.id, el);
-}}>
-  <CodeCell
-    cell={cell}
-    isSelected={notebookState.selectedCellId === cell.id}
-    isHighlighted={highlightedCellId === cell.id}
-    onExecute={executeCell}
-    onDelete={deleteCell}
-    onUpdate={updateCell}
-    onSelect={selectCell}
-    onAddAbove={(id) => addCell(id, 'above')}
-    onAddBelow={(id) => addCell(id, 'below')}
-    onMoveUp={(id) => moveCell(id, 'up')}
-    onMoveDown={(id) => moveCell(id, 'down')}
-    onGenerateCode={handleGenerateCode}
-    onAddInsight={handleOpenInsightModal}
-    onUpdateHypothesisTags={handleUpdateCellHypothesisTags}
-    hypotheses={notebookState.hypotheses}
-    insights={notebookState.insights}
-    tags={notebookState.tags}
-    onUpdateInsight={handleUpdateInsight}
-    onDeleteInsight={handleDeleteInsight}
-    canMoveUp={index > 0}
-    canMoveDown={index < notebookState.cells.length - 1}
-    datasetInfo={notebookState.dataset?.summary}
-  />
-</div>
+        <div 
+          key={`${cell.id}-${index}`}
+          id={`section-${cell.id}`}
+          ref={(el) => {
+            if (el) cellRefs.current.set(cell.id, el);
+          }}
+        >
+          <CodeCell
+            cell={cell}
+            isSelected={notebookState.selectedCellId === cell.id}
+            isHighlighted={highlightedCellId === cell.id}
+            onExecute={executeCell}
+            onDelete={deleteCell}
+            onUpdate={updateCell}
+            onSelect={selectCell}
+            onAddAbove={(id) => addCell(id, 'above')}
+            onAddBelow={(id) => addCell(id, 'below')}
+            onMoveUp={(id) => moveCell(id, 'up')}
+            onMoveDown={(id) => moveCell(id, 'down')}
+            onGenerateCode={handleGenerateCode}
+            onAddInsight={handleOpenInsightModal}
+            onUpdateHypothesisTags={handleUpdateCellHypothesisTags}
+            hypotheses={notebookState.hypotheses}
+            canMoveUp={index > 0}
+            canMoveDown={index < notebookState.cells.length - 1}
+            datasetInfo={notebookState.dataset?.summary}
+          />
+        </div>
       ))
 )}
   </div>
 
-      {/* Right Column: Insights Margin */}
 {/* Right Column: Insights Margin */}
 <div 
-  className="w-[20%] bg-gray-100 border-l border-gray-300 overflow-y-auto p-4"
-  style={{ minWidth: '250px', maxWidth: '300px' }}
+ref={insightsScrollRef}
+className="bg-gray-100 border-l border-gray-300 overflow-y-auto p-4"
+style={{ width: '400px', minWidth: '350px', flexShrink: 0 }}
 >
         <div className="sticky top-0 mb-4 pb-2 bg-gray-100 z-10 border-b border-gray-300">
           <h3 className="text-sm font-semibold text-gray-700">Insights</h3>
@@ -695,27 +869,31 @@ const handleSaveInsight = useCallback((content: string, tagId: string, hypothesi
     No insights yet. Run code and click "+ Add Insight" to create insights.
   </p>
 ) : (
-  notebookState.insights.map(insight => {
-    const tag = notebookState.tags.find(t => t.id === insight.tagId);
-    if (!tag) return null;
-    
-    return (
-<div key={insight.id} ref={(el) => {
-  if (el) insightRefs.current.set(insight.id, el);
-}}>
-  <InsightCard
-    insight={insight}
-    tag={tag}
-    onUpdate={handleUpdateInsight}
-    onDelete={handleDeleteInsight}
-    onClick={() => handleInsightClick(insight.id, insight.cellId)}
-    isHighlighted={highlightedInsightId === insight.id}
-    allTags={notebookState.tags}
-    hypotheses={notebookState.hypotheses}
-  />
-</div>
-    );
-  })
+    notebookState.insights.map(insight => {
+        const tag = notebookState.tags.find(t => t.id === insight.tagId);
+        
+        return (
+          <div
+            key={insight.id}
+            id={`section-${insight.id}`}
+            ref={(el) => {
+              if (el) insightRefs.current.set(insight.id, el);
+            }}
+          >
+            <InsightCard
+              insight={insight}
+              tag={tag}
+              onUpdate={handleUpdateInsight}
+              onDelete={handleDeleteInsight}
+              onAddTag={handleAddTag}
+              onClick={() => handleInsightClick(insight.id, insight.cellId)}
+              isHighlighted={highlightedInsightId === insight.id}
+              allTags={notebookState.tags}
+              hypotheses={notebookState.hypotheses}
+            />
+          </div>
+        );
+      })
 )}
         </div>
       </div>
