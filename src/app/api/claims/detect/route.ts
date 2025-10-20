@@ -1,23 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ClaimStructure } from '@/types/writing';
+import { ClaimDetector } from '@/lib/services/claimDetector';
+import { generateId } from '@/lib/utils/text';
 
 /**
  * POST /api/claims/detect
  * 
  * Detects claims in the provided text
- * 
- * Request body:
- * {
- *   text: string,              // Full document text
- *   cursorPosition?: number,   // Optional: current cursor position
- *   projectId: string          // For context
- * }
- * 
- * Response:
- * {
- *   claims: ClaimStructure[],
- *   processingTime: number
- * }
  */
 export async function POST(request: NextRequest) {
   try {
@@ -40,9 +29,34 @@ export async function POST(request: NextRequest) {
 
     const startTime = Date.now();
 
-    // TODO: Implement claim detection logic
-    // This will be implemented in Phase 2
-    const claims: ClaimStructure[] = [];
+    // Detect claims using ClaimDetector
+    const detector = new ClaimDetector();
+    const detectedClaims = detector.detectClaims(text);
+
+    // Convert to ClaimStructure format
+    const claims: ClaimStructure[] = detectedClaims.map(detected => ({
+      id: generateId('claim'),
+      text: detected.text,
+      position: {
+        from: detected.position.from,
+        to: detected.position.to,
+        paragraphIndex: 0, // TODO: Calculate actual paragraph index
+      },
+      type: detected.type,
+      confidence: detected.confidence,
+      detectedAt: new Date(),
+      hypothesisLinks: [], // TODO: Link to hypotheses in next step
+      strongLanguage: detected.strongLanguage.map(marker => ({
+        word: marker.word,
+        type: marker.type,
+        position: { 
+          from: detected.position.from, 
+          to: detected.position.from + marker.word.length 
+        },
+        intensity: marker.intensity,
+      })),
+      status: 'detected' as const,
+    }));
 
     const processingTime = Date.now() - startTime;
 
