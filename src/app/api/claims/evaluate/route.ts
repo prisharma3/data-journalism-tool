@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ClaimEvaluationRequest, ClaimEvaluationResponse } from '@/types/writing';
-import { ToulminEvaluator } from '@/lib/services/toulminEvaluator';
+import { GeminiService } from '@/lib/services/geminiService';
+import { generateId } from '@/lib/utils/text';
 
 /**
  * POST /api/claims/evaluate
  * 
- * Evaluates a claim against notebook evidence using Toulmin framework
+ * Evaluates a claim using Gemini AI and Toulmin framework
  */
 export async function POST(request: NextRequest) {
   try {
@@ -28,18 +29,65 @@ export async function POST(request: NextRequest) {
 
     const startTime = Date.now();
 
-    // Evaluate claim using Toulmin framework
-    const evaluator = new ToulminEvaluator();
-    const toulminDiagram = evaluator.evaluate(
+    // Use Gemini to evaluate
+    const gemini = new GeminiService();
+    const geminiEvaluation = await gemini.evaluateClaim(
       evaluationRequest.claim,
       evaluationRequest.notebookContext
     );
 
-    // Generate suggestions based on issues
-    const suggestions = toulminDiagram.issues.map(issue => ({
-      id: issue.id,
+    // Build Toulmin diagram from Gemini response
+    const toulminDiagram = {
       claimId: evaluationRequest.claim.id,
-      type: mapIssueToClaim(issue.type),
+      claim: evaluationRequest.claim.text,
+      grounds: geminiEvaluation.grounds.map((g: any) => ({
+        id: generateId('evidence'),
+        type: g.sourceType === 'insight' ? 'insight' : 'textual',
+        sourceId: generateId('source'),
+        sourceType: g.sourceType,
+        content: g.content,
+        relevanceScore: g.relevanceScore,
+        strengthScore: g.strengthScore,
+        recencyScore: 1.0,
+        confidenceScore: g.strengthScore,
+        hypothesisTags: [],
+        extractedStatistics: [],
+      })),
+      warrant: {
+        statement: geminiEvaluation.warrant.statement,
+        type: geminiEvaluation.warrant.type,
+        isExplicit: false,
+        acceptanceLevel: geminiEvaluation.warrant.acceptanceLevel,
+        needsBacking: geminiEvaluation.warrant.acceptanceLevel !== 'widely-accepted',
+        confidence: geminiEvaluation.warrant.confidence,
+      },
+      backing: [],
+      qualifier: geminiEvaluation.qualifier,
+      rebuttal: [],
+      strength: geminiEvaluation.strength,
+      overallScore: geminiEvaluation.overallScore,
+      issues: geminiEvaluation.issues.map((issue: any) => ({
+        id: generateId('issue'),
+        type: issue.type,
+        severity: issue.severity,
+        message: issue.message,
+        explanation: issue.explanation,
+      })),
+      gaps: geminiEvaluation.gaps.map((gap: any) => ({
+        id: generateId('gap'),
+        type: gap.type,
+        description: gap.description,
+        missingConcepts: gap.missingConcepts,
+        importance: gap.importance,
+      })),
+      evaluatedAt: new Date(),
+    };
+
+    // Generate suggestions based on issues
+    const suggestions = geminiEvaluation.issues.map((issue: any) => ({
+      id: generateId('suggestion'),
+      claimId: evaluationRequest.claim.id,
+      type: mapIssueToSuggestion(issue.type),
       severity: issue.severity,
       message: issue.message,
       explanation: issue.explanation,
@@ -54,7 +102,7 @@ export async function POST(request: NextRequest) {
       claimId: evaluationRequest.claim.id,
       toulminDiagram,
       suggestions,
-      analysisGaps: toulminDiagram.gaps,
+      analysisGaps: geminiEvaluation.gaps,
       processingTime: Date.now() - startTime,
     };
 
@@ -69,10 +117,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-/**
- * Map issue type to suggestion type
- */
-function mapIssueToClaim(issueType: string): string {
+function mapIssueToSuggestion(issueType: string): string {
   const mapping: Record<string, string> = {
     'no-evidence': 'add-analysis',
     'weak-evidence': 'add-analysis',
@@ -80,6 +125,5 @@ function mapIssueToClaim(issueType: string): string {
     'missing-qualifier': 'add-qualifier',
     'causation-correlation': 'weaken-claim',
   };
-  
   return mapping[issueType] || 'grammar';
 }
