@@ -1,27 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { AnalysisSuggestion, EvidenceGap } from '@/types/writing';
+import { GeminiService } from '@/lib/services/geminiService';
+import { generateId } from '@/lib/utils/text';
 
 /**
  * POST /api/analysis/suggest
  * 
- * Suggests analyses that would strengthen a claim
- * 
- * Request body:
- * {
- *   claimText: string,
- *   gaps: EvidenceGap[],
- *   datasetInfo: any,
- *   existingAnalyses: string[]
- * }
- * 
- * Response:
- * {
- *   suggestions: AnalysisSuggestion[]
- * }
+ * Suggests analyses using Gemini AI to fill evidence gaps
  */
 export async function POST(request: NextRequest) {
   try {
-    const { claimText, gaps, datasetInfo, existingAnalyses } = await request.json();
+    const { claimText, gaps, datasetInfo, existingAnalyses, notebookContext } = await request.json();
 
     // Validation
     if (!claimText) {
@@ -31,12 +19,37 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // TODO: Implement analysis suggestion logic
-    // This will be implemented in Phase 6
-    const suggestions: AnalysisSuggestion[] = [];
+    if (!gaps || !Array.isArray(gaps)) {
+      return NextResponse.json(
+        { error: 'gaps array is required' },
+        { status: 400 }
+      );
+    }
+
+    const startTime = Date.now();
+
+    // Use Gemini to suggest analyses
+    const gemini = new GeminiService();
+    const suggestions = await gemini.suggestAnalysis(
+      claimText,
+      gaps,
+      notebookContext || {
+        dataset: datasetInfo,
+        cells: existingAnalyses?.map((query: string) => ({ query })) || [],
+      }
+    );
+
+    // Add IDs to suggestions
+    const suggestionsWithIds = suggestions.map((s: any) => ({
+      id: generateId('analysis-suggestion'),
+      ...s,
+    }));
+
+    const processingTime = Date.now() - startTime;
 
     return NextResponse.json({
-      suggestions,
+      suggestions: suggestionsWithIds,
+      processingTime,
     });
 
   } catch (error: any) {

@@ -55,9 +55,13 @@ export class GeminiService {
     const prompt = this.buildEvaluationPrompt(claim, notebookContext);
     const response = await this.callGemini(prompt);
     
-    // Parse JSON response from Gemini
     try {
-      const jsonMatch = response.match(/\{[\s\S]*\}/);
+      // Remove markdown code blocks if present
+      let cleanedResponse = response.trim();
+      cleanedResponse = cleanedResponse.replace(/```json\s*/g, '');
+      cleanedResponse = cleanedResponse.replace(/```\s*/g, '');
+      
+      const jsonMatch = cleanedResponse.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         return JSON.parse(jsonMatch[0]);
       }
@@ -155,7 +159,12 @@ Evaluate this claim using Toulmin's framework and return a JSON object with this
     const response = await this.callGemini(prompt);
     
     try {
-      const jsonMatch = response.match(/\{[\s\S]*\}/);
+      // Remove markdown code blocks if present
+      let cleanedResponse = response.trim();
+      cleanedResponse = cleanedResponse.replace(/```json\s*/g, '');
+      cleanedResponse = cleanedResponse.replace(/```\s*/g, '');
+      
+      const jsonMatch = cleanedResponse.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         return JSON.parse(jsonMatch[0]);
       }
@@ -206,4 +215,187 @@ Return a JSON object with this structure:
 - Be specific about what you changed and why
 - Return ONLY valid JSON, no other text`;
   }
+
+ /**
+   * Detect claims in text using Gemini
+   */
+ async detectClaims(text: string, projectContext?: any): Promise<any[]> {
+    const prompt = this.buildClaimDetectionPrompt(text, projectContext);
+    const response = await this.callGemini(prompt);
+    
+    try {
+      // Remove markdown code blocks if present
+      let cleanedResponse = response.trim();
+      
+      // Remove ```json and ``` markers
+      cleanedResponse = cleanedResponse.replace(/```json\s*/g, '');
+      cleanedResponse = cleanedResponse.replace(/```\s*/g, '');
+      
+      // Extract JSON
+      const jsonMatch = cleanedResponse.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const result = JSON.parse(jsonMatch[0]);
+        return result.claims || [];
+      }
+      
+      console.error('No JSON found in response:', response);
+      return []; // Return empty array instead of throwing
+    } catch (error) {
+      console.error('Failed to parse Gemini response:', response);
+      return []; // Return empty array instead of throwing
+    }
+  }
+  
+  /**
+   * Build claim detection prompt
+   */
+  private buildClaimDetectionPrompt(text: string, projectContext?: any): string {
+    return `You are an expert research analyst identifying claims in academic writing.
+
+**TEXT TO ANALYZE:**
+"${text}"
+
+${projectContext?.hypotheses ? `
+**RESEARCH CONTEXT:**
+The author is investigating these research questions:
+${projectContext.hypotheses.map((h: any) => `- ${h.content}`).join('\n')}
+` : ''}
+
+**YOUR TASK:**
+Identify all claims (assertions that require evidence) in this text. A claim is a statement that:
+1. Makes an assertion about reality, relationships, or outcomes
+2. Requires evidence or data to support it
+3. Is not merely a description of the data itself
+
+**NOT CLAIMS:**
+- Questions ("Does X affect Y?")
+- Descriptions of data ("The dataset has 1000 rows")
+- Methodological statements ("We used regression analysis")
+
+Return a JSON object with this structure:
+{
+  "claims": [
+    {
+      "text": "the exact claim sentence",
+      "type": "causal" or "comparative" or "predictive" or "descriptive",
+      "position": {
+        "from": character_offset_start,
+        "to": character_offset_end
+      },
+      "confidence": 0.0-1.0,
+      "reasoning": "why this is a claim",
+      "strongLanguage": [
+        {
+          "word": "definitely",
+          "type": "absolute" or "hedge" or "causal" or "comparative",
+          "intensity": 0.0-1.0
+        }
+      ]
+    }
+  ]
+}
+
+**CLAIM TYPES:**
+- causal: Claims X causes/affects Y
+- comparative: Claims X is more/less/better than Y  
+- predictive: Claims X will happen in the future
+- descriptive: Claims X has property Y
+
+**STRONG LANGUAGE:**
+- absolute: definitely, certainly, always, never, proves, all, none
+- hedge: might, could, possibly, likely, some, many
+- causal: causes, leads to, results in, affects
+- comparative: more, less, better, worse, higher, lower
+
+**IMPORTANT:**
+- Return ONLY valid JSON, no other text
+- Be precise with character positions
+- Only flag actual claims that need evidence support`;
+  }
+
+
+
+/**
+   * Generate analysis suggestions for gaps
+   */
+async suggestAnalysis(
+    claim: string,
+    gaps: any[],
+    notebookContext: any
+  ): Promise<any[]> {
+    const prompt = this.buildAnalysisSuggestionPrompt(claim, gaps, notebookContext);
+    const response = await this.callGemini(prompt);
+    
+    try {
+      // Remove markdown code blocks if present
+      let cleanedResponse = response.trim();
+      cleanedResponse = cleanedResponse.replace(/```json\s*/g, '');
+      cleanedResponse = cleanedResponse.replace(/```\s*/g, '');
+      
+      const jsonMatch = cleanedResponse.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const result = JSON.parse(jsonMatch[0]);
+        return result.suggestions || [];
+      }
+      throw new Error('No valid JSON in response');
+    } catch (error) {
+      console.error('Failed to parse Gemini response:', response);
+      throw new Error('Invalid response format from Gemini');
+    }
+  }
+  
+  /**
+   * Build analysis suggestion prompt
+   */
+  private buildAnalysisSuggestionPrompt(
+    claim: string,
+    gaps: any[],
+    notebookContext: any
+  ): string {
+    return `You are an expert data analyst helping users design analyses to support their claims.
+
+**USER'S CLAIM:**
+"${claim}"
+
+**IDENTIFIED GAPS:**
+${gaps.map(g => `- ${g.description} (missing: ${g.missingConcepts.join(', ')})`).join('\n')}
+
+**AVAILABLE DATA:**
+Dataset: ${notebookContext.dataset?.filename || 'Unknown'}
+${notebookContext.dataset?.summary ? `
+Columns: ${notebookContext.dataset.summary.columnNames?.join(', ') || 'Unknown'}
+Rows: ${notebookContext.dataset.summary.rows || 'Unknown'}
+` : ''}
+
+**EXISTING ANALYSES:**
+${notebookContext.cells.map((c: any) => `- ${c.query}`).join('\n') || 'None yet'}
+
+**YOUR TASK:**
+Generate 2-3 specific analysis suggestions that would fill these gaps and strengthen the claim.
+
+Return a JSON object with this structure:
+{
+  "suggestions": [
+    {
+      "title": "Short descriptive title",
+      "naturalLanguageQuery": "Specific query for code generation (e.g., 'Show correlation between X and Y for ages 18-25')",
+      "explanation": "Why this analysis is needed (1-2 sentences)",
+      "expectedOutput": "What kind of results to expect",
+      "priority": "high" or "medium" or "low",
+      "estimatedComplexity": "simple" or "moderate" or "complex",
+      "fillsGaps": ["gap type 1", "gap type 2"]
+    }
+  ]
+}
+
+**GUIDELINES:**
+- Be specific: mention exact variables, groups, or relationships to analyze
+- Make queries actionable: they should be ready for code generation
+- Prioritize analyses that directly test the claim
+- Consider the available data columns
+- Don't suggest analyses that already exist
+- Return ONLY valid JSON, no other text`;
+  }
+
+
 }

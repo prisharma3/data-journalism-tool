@@ -1,16 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ClaimStructure } from '@/types/writing';
-import { ClaimDetector } from '@/lib/services/claimDetector';
+import { GeminiService } from '@/lib/services/geminiService';
 import { generateId } from '@/lib/utils/text';
 
 /**
  * POST /api/claims/detect
  * 
- * Detects claims in the provided text
+ * Detects claims using Gemini AI
  */
 export async function POST(request: NextRequest) {
   try {
-    const { text, cursorPosition, projectId } = await request.json();
+    const { text, cursorPosition, projectId, hypotheses } = await request.json();
 
     // Validation
     if (!text || typeof text !== 'string') {
@@ -29,24 +29,25 @@ export async function POST(request: NextRequest) {
 
     const startTime = Date.now();
 
-    // Detect claims using ClaimDetector
-    const detector = new ClaimDetector();
-    const detectedClaims = detector.detectClaims(text);
+    // Use Gemini to detect claims
+    const gemini = new GeminiService();
+    const projectContext = hypotheses ? { hypotheses } : undefined;
+    const detectedClaims = await gemini.detectClaims(text, projectContext);
 
     // Convert to ClaimStructure format
-    const claims: ClaimStructure[] = detectedClaims.map(detected => ({
+    const claims: ClaimStructure[] = detectedClaims.map((detected: any) => ({
       id: generateId('claim'),
       text: detected.text,
       position: {
         from: detected.position.from,
         to: detected.position.to,
-        paragraphIndex: 0, // TODO: Calculate actual paragraph index
+        paragraphIndex: 0, // Calculate if needed
       },
       type: detected.type,
       confidence: detected.confidence,
       detectedAt: new Date(),
-      hypothesisLinks: [], // TODO: Link to hypotheses in next step
-      strongLanguage: detected.strongLanguage.map(marker => ({
+      hypothesisLinks: [], // TODO: Implement hypothesis linking
+      strongLanguage: detected.strongLanguage.map((marker: any) => ({
         word: marker.word,
         type: marker.type,
         position: { 
