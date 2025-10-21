@@ -61,10 +61,12 @@ export function useClaimEvaluation({
       }
 
       const data = await response.json();
+      console.log('Claims detected:', data.claims.length); // ADD THIS
       setClaims(data.claims);
-
+      
       // Auto-evaluate claims
       if (data.claims.length > 0) {
+        console.log('Starting evaluation...'); // ADD THIS
         evaluateClaims(data.claims);
       } else {
         setSuggestions([]);

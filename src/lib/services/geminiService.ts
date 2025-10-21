@@ -32,8 +32,8 @@ export class GeminiService {
             parts: [{ text: prompt }]
           }],
           generationConfig: {
-            temperature: 0.2, // Lower = more deterministic
-            maxOutputTokens: 2048,
+            temperature: 0.2,
+            maxOutputTokens: 8192,
           }
         }),
       }
@@ -47,6 +47,51 @@ export class GeminiService {
     const data = await response.json();
     return data.candidates[0].content.parts[0].text;
   }
+
+/**
+ * Extract and parse JSON from Gemini response
+ * IMPROVED: Handles markdown code blocks and gets complete JSON
+ */
+private parseGeminiJSON(response: string): any {
+    try {
+      // Remove markdown code blocks
+      let cleaned = response.trim();
+      cleaned = cleaned.replace(/```json\s*/gi, '');
+      cleaned = cleaned.replace(/```\s*/g, '');
+      cleaned = cleaned.trim();
+      
+      // Find the start of JSON
+      const startIndex = cleaned.indexOf('{');
+      if (startIndex === -1) {
+        throw new Error('No JSON object found');
+      }
+      
+      // Find the matching closing brace using a counter
+      let braceCount = 0;
+      let endIndex = -1;
+      
+      for (let i = startIndex; i < cleaned.length; i++) {
+        if (cleaned[i] === '{') braceCount++;
+        if (cleaned[i] === '}') braceCount--;
+        
+        if (braceCount === 0) {
+          endIndex = i + 1;
+          break;
+        }
+      }
+      
+      if (endIndex === -1) {
+        throw new Error('Unclosed JSON object');
+      }
+      
+      const jsonStr = cleaned.substring(startIndex, endIndex);
+      return JSON.parse(jsonStr);
+      
+    } catch (error) {
+      console.error('Failed to parse Gemini response:', response);
+      throw new Error('Invalid JSON response from Gemini');
+    }
+  }
   
   /**
    * Evaluate claim using Toulmin framework with Gemini
@@ -54,22 +99,7 @@ export class GeminiService {
   async evaluateClaim(claim: ClaimStructure, notebookContext: any): Promise<any> {
     const prompt = this.buildEvaluationPrompt(claim, notebookContext);
     const response = await this.callGemini(prompt);
-    
-    try {
-      // Remove markdown code blocks if present
-      let cleanedResponse = response.trim();
-      cleanedResponse = cleanedResponse.replace(/```json\s*/g, '');
-      cleanedResponse = cleanedResponse.replace(/```\s*/g, '');
-      
-      const jsonMatch = cleanedResponse.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        return JSON.parse(jsonMatch[0]);
-      }
-      throw new Error('No valid JSON in response');
-    } catch (error) {
-      console.error('Failed to parse Gemini response:', response);
-      throw new Error('Invalid response format from Gemini');
-    }
+    return this.parseGeminiJSON(response);
   }
   
   /**
@@ -157,22 +187,7 @@ Evaluate this claim using Toulmin's framework and return a JSON object with this
   ): Promise<{ suggestions: string[]; explanations: string[]; explanation: string }> {
     const prompt = this.buildModificationPrompt(claimText, evaluation, modificationType);
     const response = await this.callGemini(prompt);
-    
-    try {
-      // Remove markdown code blocks if present
-      let cleanedResponse = response.trim();
-      cleanedResponse = cleanedResponse.replace(/```json\s*/g, '');
-      cleanedResponse = cleanedResponse.replace(/```\s*/g, '');
-      
-      const jsonMatch = cleanedResponse.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        return JSON.parse(jsonMatch[0]);
-      }
-      throw new Error('No valid JSON in response');
-    } catch (error) {
-      console.error('Failed to parse Gemini response:', response);
-      throw new Error('Invalid response format from Gemini');
-    }
+    return this.parseGeminiJSON(response);
   }
   
   /**
@@ -216,33 +231,31 @@ Return a JSON object with this structure:
 - Return ONLY valid JSON, no other text`;
   }
 
- /**
+  /**
    * Detect claims in text using Gemini
    */
- async detectClaims(text: string, projectContext?: any): Promise<any[]> {
+  async detectClaims(text: string, projectContext?: any): Promise<any[]> {
     const prompt = this.buildClaimDetectionPrompt(text, projectContext);
     const response = await this.callGemini(prompt);
     
+    console.log('Response length:', response.length);
+    console.log('Response preview:', response.substring(0, 200));
+    
     try {
-      // Remove markdown code blocks if present
-      let cleanedResponse = response.trim();
+      const result = this.parseGeminiJSON(response);
+      console.log('Parsed successfully, claims count:', result.claims?.length || 0);
+      return result.claims || [];
+    } catch (error: any) {
+      console.error('Parse error:', error.message);
       
-      // Remove ```json and ``` markers
-      cleanedResponse = cleanedResponse.replace(/```json\s*/g, '');
-      cleanedResponse = cleanedResponse.replace(/```\s*/g, '');
+      // Log where parsing failed
+      const cleaned = response.trim()
+        .replace(/```json\s*/gi, '')
+        .replace(/```\s*/g, '')
+        .trim();
       
-      // Extract JSON
-      const jsonMatch = cleanedResponse.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        const result = JSON.parse(jsonMatch[0]);
-        return result.claims || [];
-      }
-      
-      console.error('No JSON found in response:', response);
-      return []; // Return empty array instead of throwing
-    } catch (error) {
-      console.error('Failed to parse Gemini response:', response);
-      return []; // Return empty array instead of throwing
+      console.log('Cleaned response ends with:', cleaned.substring(cleaned.length - 100));
+      return [];
     }
   }
   
@@ -313,12 +326,10 @@ Return a JSON object with this structure:
 - Only flag actual claims that need evidence support`;
   }
 
-
-
-/**
+  /**
    * Generate analysis suggestions for gaps
    */
-async suggestAnalysis(
+  async suggestAnalysis(
     claim: string,
     gaps: any[],
     notebookContext: any
@@ -327,20 +338,11 @@ async suggestAnalysis(
     const response = await this.callGemini(prompt);
     
     try {
-      // Remove markdown code blocks if present
-      let cleanedResponse = response.trim();
-      cleanedResponse = cleanedResponse.replace(/```json\s*/g, '');
-      cleanedResponse = cleanedResponse.replace(/```\s*/g, '');
-      
-      const jsonMatch = cleanedResponse.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        const result = JSON.parse(jsonMatch[0]);
-        return result.suggestions || [];
-      }
-      throw new Error('No valid JSON in response');
+      const result = this.parseGeminiJSON(response);
+      return result.suggestions || [];
     } catch (error) {
-      console.error('Failed to parse Gemini response:', response);
-      throw new Error('Invalid response format from Gemini');
+      console.error('Failed to parse analysis suggestions from Gemini');
+      return [];
     }
   }
   
@@ -396,6 +398,4 @@ Return a JSON object with this structure:
 - Don't suggest analyses that already exist
 - Return ONLY valid JSON, no other text`;
   }
-
-
 }

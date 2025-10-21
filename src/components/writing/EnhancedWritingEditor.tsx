@@ -6,6 +6,8 @@
 import React, { useState } from 'react';
 import { useClaimEvaluation } from '@/hooks/useClaimEvaluation';
 import { SuggestionPanel } from './SuggestionPanel';
+import { TextWithClaims } from './TextWithClaims';
+import { ToulminModal } from './ToulminModal';
 
 interface EnhancedWritingEditorProps {
   projectId: string;
@@ -25,6 +27,10 @@ export function EnhancedWritingEditor({
   const [content, setContent] = useState(initialContent);
   const [cursorPosition, setCursorPosition] = useState(0);
   const [enabled, setEnabled] = useState(true);
+  const [selectedClaimId, setSelectedClaimId] = useState<string | null>(null);
+const [selectedEvaluation, setSelectedEvaluation] = useState<any | null>(null);
+const [isModalOpen, setIsModalOpen] = useState(false);
+const [dismissedSuggestions, setDismissedSuggestions] = useState<Set<string>>(new Set()); 
 
   // Use claim evaluation hook
   const {
@@ -56,7 +62,7 @@ export function EnhancedWritingEditor({
   const handleAcceptSuggestion = async (suggestionId: string) => {
     const suggestion = suggestions.find(s => s.id === suggestionId);
     if (!suggestion) return;
-
+  
     if (suggestion.type === 'add-analysis') {
       // Suggest analyses for missing evidence
       const claim = claims.find(c => c.id === suggestion.claimId);
@@ -65,42 +71,132 @@ export function EnhancedWritingEditor({
           const result = await suggestAnalyses(claim.text, []);
           console.log('Analysis suggestions:', result.suggestions);
           // TODO: Show analysis suggestions modal
+          alert('Analysis suggestions generated! Check console for now.');
         } catch (err) {
           console.error('Failed to suggest analyses:', err);
         }
       }
     } else {
-      // Generate claim modifications
+      // Generate claim modifications and apply to text
       const claim = claims.find(c => c.id === suggestion.claimId);
-      if (claim) {
-        try {
-          const modificationType = 
-            suggestion.type === 'weaken-claim' ? 'weaken' :
-            suggestion.type === 'add-caveat' ? 'caveat' :
-            'reverse';
-
-          const result = await generateModifications(
-            claim.text,
-            {}, // Would need full evaluation here
-            modificationType as any
-          );
-          console.log('Modification suggestions:', result.suggestions);
-          // TODO: Show modification suggestions modal
-        } catch (err) {
-          console.error('Failed to generate modifications:', err);
+      if (!claim) return;
+  
+      try {
+        const modificationType = 
+          suggestion.type === 'weaken-claim' ? 'weaken' :
+          suggestion.type === 'add-caveat' ? 'caveat' :
+          suggestion.type === 'add-qualifier' ? 'weaken' :
+          'weaken';
+  
+        // Get the full evaluation for this claim
+        const evalResponse = await fetch('/api/claims/evaluate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            claim,
+            notebookContext,
+          }),
+        });
+  
+        if (!evalResponse.ok) {
+          throw new Error('Failed to evaluate claim');
         }
+  
+        const evalData = await evalResponse.json();
+  
+        // Generate modifications
+        const result = await generateModifications(
+          claim.text,
+          evalData.toulminDiagram,
+          modificationType as any
+        );
+  
+        console.log('Modification suggestions:', result.suggestions);
+  
+        // Show user the options and let them pick one
+        if (result.suggestions && result.suggestions.length > 0) {
+          const choice = await showModificationChoice(result.suggestions, result.explanations);
+          
+          if (choice !== null) {
+            // Replace the claim text with the selected suggestion
+            const newText = 
+              content.substring(0, claim.position.from) +
+              result.suggestions[choice] +
+              content.substring(claim.position.to);
+            
+            handleContentChange(newText, claim.position.from);
+            
+            // Show success message
+            alert('Claim updated successfully!');
+          }
+        }
+      } catch (err) {
+        console.error('Failed to generate modifications:', err);
+        alert('Failed to generate suggestions. Please try again.');
       }
     }
   };
+  
+  // Helper function to show modification choices
+  const showModificationChoice = (suggestions: string[], explanations: string[]): Promise<number | null> => {
+    return new Promise((resolve) => {
+      const message = suggestions.map((s, i) => `${i + 1}. ${s}\n   ${explanations[i]}`).join('\n\n');
+      const choice = prompt(`Choose a replacement (1-${suggestions.length}):\n\n${message}`);
+      
+      if (choice === null) {
+        resolve(null);
+      } else {
+        const num = parseInt(choice) - 1;
+        if (num >= 0 && num < suggestions.length) {
+          resolve(num);
+        } else {
+          resolve(null);
+        }
+      }
+    });
+  };
 
   const handleDismissSuggestion = (suggestionId: string) => {
-    // TODO: Mark suggestion as dismissed
-    console.log('Dismissed suggestion:', suggestionId);
+    setDismissedSuggestions(prev => new Set([...prev, suggestionId]));
+  };
+
+  const handleClaimClick = async (claimId: string) => {
+    const claim = claims.find(c => c.id === claimId);
+    if (!claim) return;
+  
+    setSelectedClaimId(claimId);
+    setIsModalOpen(true);
+  
+    // Fetch evaluation for this claim
+    try {
+      const response = await fetch('/api/claims/evaluate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          claim,
+          notebookContext,
+        }),
+      });
+  
+      if (response.ok) {
+        const data = await response.json();
+        setSelectedEvaluation(data.toulminDiagram);
+      }
+    } catch (err) {
+      console.error('Failed to load evaluation:', err);
+    }
+  };
+  
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setSelectedClaimId(null);
+    setSelectedEvaluation(null);
   };
 
   const handleViewEvidence = (cellId: string) => {
-    // TODO: Open focused view of notebook cell
+    // TODO: Scroll to and highlight the evidence in notebook
     console.log('View evidence from cell:', cellId);
+    alert(`Evidence viewing will open the notebook and highlight cell: ${cellId}`);
   };
 
   return (
@@ -149,21 +245,44 @@ export function EnhancedWritingEditor({
         </div>
 
         {/* Editor */}
-        <div className="flex-1 overflow-y-auto bg-white">
-          <textarea
-            value={content}
-            onChange={(e) => {
-              const newPos = e.target.selectionStart;
-              handleContentChange(e.target.value, newPos);
-            }}
-            onSelect={(e) => {
-              const target = e.target as HTMLTextAreaElement;
-              setCursorPosition(target.selectionStart);
-            }}
-            placeholder="Start writing your article... Claims will be automatically detected and evaluated."
-            className="w-full h-full p-8 text-base leading-relaxed resize-none focus:outline-none font-serif"
-            style={{ minHeight: '600px' }}
-          />
+{/* Editor - Split View */}
+<div className="flex-1 overflow-y-auto bg-white">
+          <div className="grid grid-cols-2 gap-4 p-8 h-full">
+            {/* Editable textarea */}
+            <div className="relative">
+              <label className="text-xs font-medium text-gray-500 mb-2 block">
+                Edit Mode
+              </label>
+              <textarea
+                value={content}
+                onChange={(e) => {
+                  const newPos = e.target.selectionStart;
+                  handleContentChange(e.target.value, newPos);
+                }}
+                onSelect={(e) => {
+                  const target = e.target as HTMLTextAreaElement;
+                  setCursorPosition(target.selectionStart);
+                }}
+                placeholder="Start writing your article... Claims will be automatically detected and evaluated."
+                className="w-full h-full p-4 text-base leading-relaxed resize-none focus:outline-none font-serif border border-gray-200 rounded-lg"
+              />
+            </div>
+
+            {/* Preview with claim underlines */}
+            <div className="relative border-l border-gray-200 pl-4">
+              <label className="text-xs font-medium text-gray-500 mb-2 block">
+                Preview with Claims ({claims.length})
+              </label>
+              <div className="p-4 bg-gray-50 rounded-lg min-h-full">
+                <TextWithClaims
+                  text={content}
+                  claims={claims}
+                  suggestions={suggestions}
+                  onClaimClick={handleClaimClick}
+                />
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Error display */}
@@ -174,15 +293,25 @@ export function EnhancedWritingEditor({
         )}
       </div>
 
-      {/* Suggestion Panel */}
-      <SuggestionPanel
-        suggestions={suggestions}
+{/* Suggestion Panel */}
+<SuggestionPanel
+  suggestions={suggestions.filter(s => !dismissedSuggestions.has(s.id))}
         relevantAnalyses={relevantAnalyses}
         isLoadingSuggestions={isEvaluating}
         isLoadingAnalyses={isLoadingRelevant}
         onAcceptSuggestion={handleAcceptSuggestion}
         onDismissSuggestion={handleDismissSuggestion}
         onViewEvidence={handleViewEvidence}
+      />
+
+      {/* Toulmin Modal */}
+      <ToulminModal
+        isOpen={isModalOpen}
+        onClose={handleCloseModal}
+        claim={claims.find(c => c.id === selectedClaimId) || null}
+        evaluation={selectedEvaluation}
+        suggestions={suggestions.filter(s => !dismissedSuggestions.has(s.id))}
+        onAcceptSuggestion={handleAcceptSuggestion}
       />
     </div>
   );
