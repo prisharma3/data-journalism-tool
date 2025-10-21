@@ -36,7 +36,7 @@ async function getUserFromToken(request: NextRequest) {
 // GET - Fetch article content for a project
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = await getUserFromToken(request);
@@ -44,8 +44,7 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const projectId = params.id;
-
+    const { id: projectId } = await params;
     // Verify project belongs to user
     const projectCheck = await query(
       `SELECT p.id FROM projects p
@@ -60,7 +59,7 @@ export async function GET(
     // Get article
     const result = await query(
       `SELECT id, project_id, content, word_count, 
-              auto_save_timestamp, manual_save_timestamp
+              created_at, updated_at
        FROM articles
        WHERE project_id = $1`,
       [projectId]
@@ -72,7 +71,7 @@ export async function GET(
         `INSERT INTO articles (project_id, content, word_count)
          VALUES ($1, '', 0)
          RETURNING id, project_id, content, word_count, 
-                   auto_save_timestamp, manual_save_timestamp`,
+                   created_at, updated_at`,
         [projectId]
       );
       
@@ -90,9 +89,10 @@ export async function GET(
 }
 
 // PUT - Update article content
+// PUT - Update article content
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = await getUserFromToken(request);
@@ -100,9 +100,9 @@ export async function PUT(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const projectId = params.id;
+    const { id: projectId } = await params;
     const body = await request.json();
-    const { content, word_count, auto_save } = body;
+    const { content, word_count } = body;
 
     // Verify project belongs to user
     const projectCheck = await query(
@@ -125,47 +125,23 @@ export async function PUT(
 
     if (existingArticle.rows.length === 0) {
       // Create new article
-      const timestampField = auto_save ? 'auto_save_timestamp' : 'manual_save_timestamp';
       result = await query(
-        `INSERT INTO articles (project_id, content, word_count, ${timestampField})
-         VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
-         RETURNING id, project_id, content, word_count, 
-                   auto_save_timestamp, manual_save_timestamp`,
+        `INSERT INTO articles (project_id, content, word_count)
+         VALUES ($1, $2, $3)
+         RETURNING id, project_id, content, word_count, created_at, updated_at`,
         [projectId, content, word_count]
       );
     } else {
       // Update existing article
-      const timestampField = auto_save ? 'auto_save_timestamp' : 'manual_save_timestamp';
       result = await query(
         `UPDATE articles
          SET content = $1, 
              word_count = $2,
-             ${timestampField} = CURRENT_TIMESTAMP
+             updated_at = CURRENT_TIMESTAMP
          WHERE project_id = $3
-         RETURNING id, project_id, content, word_count, 
-                   auto_save_timestamp, manual_save_timestamp`,
+         RETURNING id, project_id, content, word_count, created_at, updated_at`,
         [content, word_count, projectId]
       );
-
-      // If manual save, create version history
-      if (!auto_save) {
-        const articleId = result.rows[0].id;
-        
-        // Get current version number
-        const versionResult = await query(
-          'SELECT MAX(version_number) as max_version FROM article_versions WHERE article_id = $1',
-          [articleId]
-        );
-        
-        const nextVersion = (versionResult.rows[0].max_version || 0) + 1;
-        
-        // Insert version
-        await query(
-          `INSERT INTO article_versions (article_id, content, word_count, version_number)
-           VALUES ($1, $2, $3, $4)`,
-          [articleId, content, word_count, nextVersion]
-        );
-      }
     }
 
     return NextResponse.json({ 

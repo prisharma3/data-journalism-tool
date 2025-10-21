@@ -11,21 +11,11 @@ interface ProjectStore {
   tags: Tag[];
   writingContent: WritingContent | null;
   
-  // Notebook state (moved from NotebookCanvas local state)
-  cells: any[];
-  dataset: any | null;
-  selectedCellId?: string;
-  isExecutingAll: boolean;
-  executionCounter: number;
-  
-  // Active context for writing
-  activeHypothesisId: string | null;
-  
   // UI state
   isLoading: boolean;
   error: string | null;
   
-  // Project actions
+  // Actions
   setCurrentProject: (project: Project | null) => void;
   setDatasets: (datasets: Dataset[]) => void;
   addDataset: (dataset: Dataset) => void;
@@ -54,23 +44,6 @@ interface ProjectStore {
   setWritingContent: (content: WritingContent | null) => void;
   updateWritingContent: (updates: Partial<WritingContent>) => void;
   
-  // Notebook cell actions
-  setCells: (cells: any[]) => void;
-  addCell: (cell: any) => void;
-  updateCell: (cellId: string, updates: any) => void;
-  removeCell: (cellId: string) => void;
-  setSelectedCell: (cellId: string | undefined) => void;
-  
-  // Dataset action
-  setDataset: (dataset: any | null) => void;
-  
-  // Execution state
-  setIsExecutingAll: (isExecuting: boolean) => void;
-  incrementExecutionCounter: () => void;
-  
-  // Active hypothesis
-  setActiveHypothesis: (hypothesisId: string | null) => void;
-  
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
   clearProject: () => void;
@@ -87,18 +60,8 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   writingContent: null,
   isLoading: false,
   error: null,
-  
-  // Notebook state
-  cells: [],
-  dataset: null,
-  selectedCellId: undefined,
-  isExecutingAll: false,
-  executionCounter: 0,
-  
-  // Active context
-  activeHypothesisId: null,
 
-  // Project actions
+  // Actions
   setCurrentProject: (project) => set({ currentProject: project }),
   
   setDatasets: (datasets) => set({ datasets }),
@@ -168,33 +131,6 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       : null
   })),
   
-  // Notebook cell actions
-  setCells: (cells) => set({ cells }),
-  addCell: (cell) => set((state) => ({ 
-    cells: [...state.cells, cell] 
-  })),
-  updateCell: (cellId, updates) => set((state) => ({
-    cells: state.cells.map(c => 
-      c.id === cellId ? { ...c, ...updates } : c
-    )
-  })),
-  removeCell: (cellId) => set((state) => ({ 
-    cells: state.cells.filter(c => c.id !== cellId) 
-  })),
-  setSelectedCell: (cellId) => set({ selectedCellId: cellId }),
-  
-  // Dataset action
-  setDataset: (dataset) => set({ dataset }),
-  
-  // Execution state
-  setIsExecutingAll: (isExecuting) => set({ isExecutingAll: isExecuting }),
-  incrementExecutionCounter: () => set((state) => ({ 
-    executionCounter: state.executionCounter + 1 
-  })),
-  
-  // Active hypothesis
-  setActiveHypothesis: (hypothesisId) => set({ activeHypothesisId: hypothesisId }),
-  
   setLoading: (loading) => set({ isLoading: loading }),
   setError: (error) => set({ error }),
   
@@ -206,12 +142,6 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     insights: [],
     tags: [],
     writingContent: null,
-    cells: [],
-    dataset: null,
-    selectedCellId: undefined,
-    isExecutingAll: false,
-    executionCounter: 0,
-    activeHypothesisId: null,
     isLoading: false,
     error: null,
   }),

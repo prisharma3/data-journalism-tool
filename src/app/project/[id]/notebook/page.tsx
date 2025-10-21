@@ -7,7 +7,7 @@ import { useAuthStore } from '@/stores/authStore';
 // Import the three main components
 import Minimap, { MinimapSection } from '@/components/minimap/Minimap';
 import NotebookCanvas from '@/components/notebook/NotebookCanvas';
-import WritingEditor from '@/components/writing/WritingEditor';
+import WritingContainer from '@/components/writing/WritingContainer';
 
 export default function NotebookPage() {
   const params = useParams();
@@ -181,7 +181,7 @@ export default function NotebookPage() {
         className="bg-white flex-shrink-0"
         style={{ width: `${writingWidth}px` }}
       >
-        <WritingEditor projectId={projectId} />
+        <WritingContainer projectId={projectId} />
       </div>
     </div>
   );

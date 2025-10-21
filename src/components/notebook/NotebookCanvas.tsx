@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect, useCallback, useMemo } from 'react';
-
+import { useProjectStore } from '@/stores/projectStore';
 import { Plus, Play, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import CodeCell from './CodeCell';
@@ -106,21 +106,47 @@ interface Hypothesis {
 
   export default function NotebookCanvas({ projectId, onSectionsChange }: NotebookCanvasProps) {
 
-    const [notebookState, setNotebookState] = useState<NotebookState>({
-        cells: [],
-        selectedCellId: undefined,
-        isExecutingAll: false,
-        executionCounter: 0,
-        dataset: null,
-        hypotheses: [],
-        insights: [],
-        tags: [
-          { id: 'tag-1', name: 'For Review', color: '#9C27B0' },
-          { id: 'tag-2', name: 'Explanation', color: '#4CAF50' },
-          { id: 'tag-3', name: 'For Teacher', color: '#F44336' },
-          { id: 'tag-4', name: 'Key Finding', color: '#2196F3' },
-        ],
-      });
+// Get state and actions from projectStore
+const {
+  cells,
+  dataset,
+  selectedCellId,
+  isExecutingAll,
+  executionCounter,
+  hypotheses,
+  insights,
+  tags,
+  setCells,
+  addCell: addCellToStore,
+  updateCell: updateCellInStore,
+  removeCell: removeCellFromStore,
+  setSelectedCell,
+  setDataset,
+  setIsExecutingAll,
+  incrementExecutionCounter,
+  setHypotheses,
+  addHypothesis: addHypothesisToStore,
+  updateHypothesis: updateHypothesisInStore,
+  removeHypothesis: removeHypothesisFromStore,
+  setInsights,
+  addInsight: addInsightToStore,
+  updateInsight: updateInsightInStore,
+  removeInsight: removeInsightFromStore,
+  setTags,
+  addTag: addTagToStore,
+} = useProjectStore();
+
+// Initialize default tags if empty
+useEffect(() => {
+  if (tags.length === 0) {
+    setTags([
+      { id: 'tag-1', name: 'For Review', color: '#9C27B0', createdAt: new Date(), updatedAt: new Date() },
+      { id: 'tag-2', name: 'Explanation', color: '#4CAF50', createdAt: new Date(), updatedAt: new Date() },
+      { id: 'tag-3', name: 'For Teacher', color: '#F44336', createdAt: new Date(), updatedAt: new Date() },
+      { id: 'tag-4', name: 'Key Finding', color: '#2196F3', createdAt: new Date(), updatedAt: new Date() },
+    ]);
+  }
+}, [tags.length, setTags]);
 
       const [insightModal, setInsightModal] = useState<{
         isOpen: boolean;
@@ -150,14 +176,14 @@ const [showNotebookFilter, setShowNotebookFilter] = useState(false);
 
 // Filter cells based on selected hypothesis filter
 const filteredCells = useMemo(() => {
-    if (notebookHypothesisFilter.length === 0) {
-      return notebookState.cells;
-    }
-    
-    return notebookState.cells.filter(cell => 
-      cell.hypothesisTags?.some(tag => notebookHypothesisFilter.includes(tag))
-    );
-  }, [notebookState.cells, notebookHypothesisFilter]);
+  if (notebookHypothesisFilter.length === 0) {
+    return cells;
+  }
+  
+  return cells.filter(cell => 
+    cell.hypothesisTags?.some(tag => notebookHypothesisFilter.includes(tag))
+  );
+}, [cells, notebookHypothesisFilter]);
 
 // Filter states for insights panel
 const [insightFilters, setInsightFilters] = useState<{
@@ -174,8 +200,8 @@ const [insightFilters, setInsightFilters] = useState<{
   }); // ADD THIS IF IT'S MISSING
 
   // Filter insights based on selected filters
-const filteredInsights = useMemo(() => {
-    let filtered = notebookState.insights;
+  const filteredInsights = useMemo(() => {
+    let filtered = insights;
     
     // Filter by hypotheses
     if (insightFilters.hypotheses.length > 0) {
@@ -192,7 +218,7 @@ const filteredInsights = useMemo(() => {
     }
     
     return filtered;
-  }, [notebookState.insights, insightFilters]);
+  }, [insights, insightFilters]);
 
   // Add this helper function to scroll to a cell
 const scrollToCell = useCallback((cellId: string) => {
@@ -222,19 +248,19 @@ const handleInsightClick = useCallback((insightId: string, cellId: string) => {
   }, []);
 
   // Generate minimap sections whenever notebook state changes
-useEffect(() => {
+  useEffect(() => {
     if (!onSectionsChange) return;
   
     const sections: MinimapSection[] = [];
     let currentPosition = 0;
-    const baseHeight = 0.05; // Base height for each section
+    const baseHeight = 0.05;
   
     // Dataset section
-    if (notebookState.dataset) {
+    if (dataset) {
       sections.push({
         id: 'dataset',
         type: 'dataset',
-        title: notebookState.dataset.filename,
+        title: dataset.filename,
         color: '#9E9E9E',
         position: currentPosition,
         height: baseHeight * 2,
@@ -243,7 +269,7 @@ useEffect(() => {
     }
   
     // Hypothesis sections
-    notebookState.hypotheses.forEach((hyp, index) => {
+    hypotheses.forEach((hyp, index) => {
       sections.push({
         id: hyp.id,
         type: 'hypothesis',
@@ -256,8 +282,7 @@ useEffect(() => {
     });
   
     // Code cells and insights
-    notebookState.cells.forEach((cell, index) => {
-      // Analysis section
+    cells.forEach((cell, index) => {
       sections.push({
         id: cell.id,
         type: 'analysis',
@@ -268,10 +293,9 @@ useEffect(() => {
       });
       currentPosition += baseHeight;
   
-      // Insights for this cell
-      const cellInsights = notebookState.insights.filter(i => i.cellId === cell.id);
+      const cellInsights = insights.filter(i => i.cellId === cell.id);
       cellInsights.forEach(insight => {
-        const tag = notebookState.tags.find(t => t.id === insight.tagId);
+        const tag = tags.find(t => t.id === insight.tagId);
         sections.push({
           id: insight.id,
           type: 'insight',
@@ -288,7 +312,7 @@ useEffect(() => {
     if (onSectionsChange) {
       onSectionsChange(sections);
     }
-}, [notebookState.dataset, notebookState.hypotheses, notebookState.cells, notebookState.insights, notebookState.tags]);
+}, [dataset, hypotheses, cells, insights, tags, onSectionsChange]);
 
 
   // Load cells from API or store
@@ -323,223 +347,181 @@ useEffect(() => {
       executionCount: undefined,
     };
 
-    setNotebookState(prev => {
-      let newCells = [...prev.cells];
-      if (afterCellId) {
-        const index = newCells.findIndex(c => c.id === afterCellId);
-        if (index !== -1) {
-          const insertIndex = position === 'above' ? index : index + 1;
-          newCells.splice(insertIndex, 0, newCell);
-        } else {
-          newCells.push(newCell);
-        }
+    let newCells = [...cells];
+    if (afterCellId) {
+      const index = newCells.findIndex(c => c.id === afterCellId);
+      if (index !== -1) {
+        const insertIndex = position === 'above' ? index : index + 1;
+        newCells.splice(insertIndex, 0, newCell);
       } else {
         newCells.push(newCell);
       }
+    } else {
+      newCells.push(newCell);
+    }
 
-      return {
-        ...prev,
-        cells: newCells,
-        selectedCellId: newCell.id,
-      };
-    });
-  }, []);
+    setCells(newCells);
+    setSelectedCell(newCell.id);
+  }, [cells, setCells, setSelectedCell]);
 
   // Delete cell
   const deleteCell = useCallback((cellId: string) => {
-    setNotebookState(prev => {
-      const newCells = prev.cells.filter(c => c.id !== cellId);
-      let newSelectedId = prev.selectedCellId;
+    const newCells = cells.filter(c => c.id !== cellId);
+    let newSelectedId = selectedCellId;
 
-      if (prev.selectedCellId === cellId) {
-        const deletedIndex = prev.cells.findIndex(c => c.id === cellId);
-        if (deletedIndex > 0) {
-          newSelectedId = prev.cells[deletedIndex - 1].id;
-        } else if (newCells.length > 0) {
-          newSelectedId = newCells[0].id;
-        } else {
-          newSelectedId = undefined;
-        }
+    if (selectedCellId === cellId) {
+      const deletedIndex = cells.findIndex(c => c.id === cellId);
+      if (deletedIndex > 0) {
+        newSelectedId = cells[deletedIndex - 1].id;
+      } else if (newCells.length > 0) {
+        newSelectedId = newCells[0].id;
+      } else {
+        newSelectedId = undefined;
       }
+    }
 
-      return {
-        ...prev,
-        cells: newCells,
-        selectedCellId: newSelectedId,
-      };
-    });
-  }, []);
+    setCells(newCells);
+    setSelectedCell(newSelectedId);
+  }, [cells, selectedCellId, setCells, setSelectedCell]);
 
   // Update cell content
   const updateCell = useCallback((cellId: string, content: string) => {
-    setNotebookState(prev => ({
-      ...prev,
-      cells: prev.cells.map(cell =>
-        cell.id === cellId ? { ...cell, content } : cell
-      ),
-    }));
-  }, []);
+    updateCellInStore(cellId, { content });
+  }, [updateCellInStore]);
 
 // Execute single cell
 const executeCell = useCallback(async (cellId: string) => {
-    const cell = notebookState.cells.find(c => c.id === cellId);
-    if (!cell || !cell.content.trim()) return;
-  
-    // Mark cell as running
-    setNotebookState(prev => ({
-      ...prev,
-      cells: prev.cells.map(c =>
-        c.id === cellId ? { ...c, isRunning: true, error: undefined, output: undefined } : c
-      ),
-    }));
-  
-    try {
-      const startTime = Date.now();
-      
-      // Dynamically import and execute with Pyodide
-      const { pyodideService } = await import('@/lib/services/pyodideService');
-      
-      // Load Pyodide if not already loaded
-      if (!pyodideService.isReady()) {
-        console.log('Loading Pyodide for the first time...');
-        await pyodideService.loadPyodide();
-      }
-      
-// Load dataset if available
-if (notebookState.dataset) {
-    try {
+  const cell = cells.find(c => c.id === cellId);
+  if (!cell || !cell.content.trim()) return;
+
+  // Mark cell as running
+  updateCellInStore(cellId, { isRunning: true, error: undefined, output: undefined });
+
+  try {
+    const startTime = Date.now();
+    
+    // Dynamically import and execute with Pyodide
+    const { pyodideService } = await import('@/lib/services/pyodideService');
+    
+    // Load Pyodide if not already loaded
+    if (!pyodideService.isReady()) {
+      console.log('Loading Pyodide for the first time...');
+      await pyodideService.loadPyodide();
+    }
+    
+    // Load dataset if available
+    if (dataset) {
+      try {
         console.log('🔍 Checking dataset availability for cell:', cellId);
-        console.log('📁 Dataset filename:', notebookState.dataset.filename);
-      // Check if dataset variable exists in Python, if not, load it
-      const datasetExists = await pyodideService.checkVariableExists('dataset');
-      console.log('✅ Dataset exists in Python:', datasetExists);
+        console.log('📁 Dataset filename:', dataset.filename);
+        // Check if dataset variable exists in Python, if not, load it
+        const datasetExists = await pyodideService.checkVariableExists('dataset');
+        console.log('✅ Dataset exists in Python:', datasetExists);
 
-      if (!datasetExists) {
-        // Write file if not in filesystem
-        console.log('⚠️ Dataset not found in Python, reloading...');
+        if (!datasetExists) {
+          // Write file if not in filesystem
+          console.log('⚠️ Dataset not found in Python, reloading...');
 
-        try {
-          await pyodideService.getDatasetVariable(notebookState.dataset.filename, 'dataset');
-          console.log('✅ Dataset reloaded successfully');
+          try {
+            await pyodideService.getDatasetVariable(dataset.filename, 'dataset');
+            console.log('✅ Dataset reloaded successfully');
 
-        } catch (err) {
-          // If dataset not in filesystem, write it first
-          console.log('❌ Dataset not in filesystem, writing file first...');
+          } catch (err) {
+            // If dataset not in filesystem, write it first
+            console.log('❌ Dataset not in filesystem, writing file first...');
 
-          await pyodideService.writeFile(notebookState.dataset.filename, notebookState.dataset.data);
-          await pyodideService.getDatasetVariable(notebookState.dataset.filename, 'dataset');
-          console.log('✅ Dataset written and loaded successfully');
+            await pyodideService.writeFile(dataset.filename, dataset.data);
+            await pyodideService.getDatasetVariable(dataset.filename, 'dataset');
+            console.log('✅ Dataset written and loaded successfully');
+          }
+        } else {
+          console.log('✅ Dataset already available in Python');
         }
-      } else {
-        console.log('✅ Dataset already available in Python');
+      } catch (err) {
+        console.error('Error loading dataset:', err);
       }
-    } catch (err) {
-      console.error('Error loading dataset:', err);
     }
+    
+    // Execute the code
+    const result = await pyodideService.executeCode(cell.content);
+    const executionTime = Date.now() - startTime;
+
+    // Update cell with results
+    incrementExecutionCounter();
+    updateCellInStore(cellId, {
+      isRunning: false,
+      output: result.error ? undefined : {
+        text: result.output,
+        plot: result.plot,
+        executionTime,
+      },
+      error: result.error,
+      executionCount: executionCounter + 1,
+    });
+  } catch (error: any) {
+    console.error('Execution error:', error);
+    updateCellInStore(cellId, {
+      isRunning: false,
+      error: error.message || 'Execution failed',
+    });
   }
-      
-      // Execute the code
-      const result = await pyodideService.executeCode(cell.content);
-      const executionTime = Date.now() - startTime;
-  
-      // Update cell with results
-      setNotebookState(prev => ({
-        ...prev,
-        executionCounter: prev.executionCounter + 1,
-        cells: prev.cells.map(c =>
-          c.id === cellId
-            ? {
-                ...c,
-                isRunning: false,
-                output: result.error ? undefined : {
-                  text: result.output,
-                  plot: result.plot,
-                  executionTime,
-                },
-                error: result.error,
-                executionCount: prev.executionCounter + 1,
-              }
-            : c
-        ),
-      }));
-    } catch (error: any) {
-      console.error('Execution error:', error);
-      setNotebookState(prev => ({
-        ...prev,
-        cells: prev.cells.map(c =>
-          c.id === cellId
-            ? {
-                ...c,
-                isRunning: false,
-                error: error.message || 'Execution failed',
-              }
-            : c
-        ),
-      }));
-    }
-  }, [notebookState.cells, notebookState.executionCounter, notebookState.dataset]);
+}, [cells, dataset, executionCounter, updateCellInStore, incrementExecutionCounter]);
 
   // Execute all cells
   const executeAllCells = useCallback(async () => {
-    setNotebookState(prev => ({ ...prev, isExecutingAll: true }));
+    setIsExecutingAll(true);
 
-    for (const cell of notebookState.cells) {
+    for (const cell of cells) {
       if (cell.content.trim()) {
         await executeCell(cell.id);
       }
     }
 
-    setNotebookState(prev => ({ ...prev, isExecutingAll: false }));
-  }, [notebookState.cells, executeCell]);
+    setIsExecutingAll(false);
+  }, [cells, executeCell, setIsExecutingAll]);
 
   // Move cell up/down
-const moveCell = useCallback((cellId: string, direction: 'up' | 'down') => {
-    setNotebookState(prev => {
-      const index = prev.cells.findIndex(c => c.id === cellId);
-      if (index === -1) return prev;
-  
-      const newCells = [...prev.cells];
-      const targetIndex = direction === 'up' ? index - 1 : index + 1;
-  
-      if (targetIndex < 0 || targetIndex >= newCells.length) return prev;
-  
-      // Swap the cells
-      [newCells[index], newCells[targetIndex]] = [newCells[targetIndex], newCells[index]];
-  
-      // Force re-render by creating new cell objects with updated keys
-      const updatedCells = newCells.map((cell, idx) => ({
-        ...cell,
-        // Add a timestamp to force Monaco to remount
-        _renderKey: `${cell.id}-${Date.now()}-${idx}`
-      }));
-  
-      return { ...prev, cells: updatedCells };
-    });
-  }, []);
+  const moveCell = useCallback((cellId: string, direction: 'up' | 'down') => {
+    const index = cells.findIndex(c => c.id === cellId);
+    if (index === -1) return;
+
+    const newCells = [...cells];
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+
+    if (targetIndex < 0 || targetIndex >= newCells.length) return;
+
+    // Swap the cells
+    [newCells[index], newCells[targetIndex]] = [newCells[targetIndex], newCells[index]];
+
+    // Force re-render by creating new cell objects with updated keys
+    const updatedCells = newCells.map((cell, idx) => ({
+      ...cell,
+      // Add a timestamp to force Monaco to remount
+      _renderKey: `${cell.id}-${Date.now()}-${idx}`
+    }));
+
+    setCells(updatedCells);
+  }, [cells, setCells]);
 
   // Clear all outputs
   const clearAllOutputs = useCallback(() => {
-    setNotebookState(prev => ({
-      ...prev,
-      cells: prev.cells.map(cell => ({
-        ...cell,
-        output: undefined,
-        error: undefined,
-        executionCount: undefined,
-      })),
-      executionCounter: 0,
+    const clearedCells = cells.map(cell => ({
+      ...cell,
+      output: undefined,
+      error: undefined,
+      executionCount: undefined,
     }));
-  }, []);
+    setCells(clearedCells);
+    // Reset execution counter
+    useProjectStore.setState({ executionCounter: 0 });
+  }, [cells, setCells]);
 
   // Select cell
   const selectCell = useCallback((cellId: string) => {
-    setNotebookState(prev => ({
-      ...prev,
-      selectedCellId: cellId,
-    }));
+    setSelectedCell(cellId);
     
     // Find insights for this cell and scroll to them
-    const cellInsights = notebookState.insights.filter(i => i.cellId === cellId);
+    const cellInsights = insights.filter(i => i.cellId === cellId);
     if (cellInsights.length > 0 && insightsScrollRef.current) {
       const firstInsight = cellInsights[0];
       const insightElement = insightRefs.current.get(firstInsight.id);
@@ -555,155 +537,107 @@ const moveCell = useCallback((cellId: string, direction: 'up' | 'down') => {
         }, 2000);
       }
     }
-  }, [notebookState.insights]);
+  }, [insights, setSelectedCell]);
 
 // Handle dataset upload
 const handleDatasetUpload = useCallback((filename: string, data: string, summary: any) => {
-    setNotebookState(prev => ({
-      ...prev,
-      dataset: { filename, data, summary },
-    }));
-  }, []);
+  setDataset({ filename, data, summary });
+}, [setDataset]);
   
 // Handle dataset removal
 const handleDatasetRemove = useCallback(async () => {
-    if (!notebookState.dataset) return;
-  
-    try {
-      // Remove from Pyodide if loaded
-      const { pyodideService } = await import('@/lib/services/pyodideService');
-      if (pyodideService.isReady()) {
-        await pyodideService.removeDataset(notebookState.dataset.filename, 'dataset');
-      }
-  
-      // Remove from state
-      setNotebookState(prev => ({
-        ...prev,
-        dataset: null,
-      }));
-    } catch (error) {
-      console.error('Error removing dataset:', error);
-      // Still remove from state even if cleanup fails
-      setNotebookState(prev => ({
-        ...prev,
-        dataset: null,
-      }));
+  if (!dataset) return;
+
+  try {
+    // Remove from Pyodide if loaded
+    const { pyodideService } = await import('@/lib/services/pyodideService');
+    if (pyodideService.isReady()) {
+      await pyodideService.removeDataset(dataset.filename, 'dataset');
     }
-  }, [notebookState.dataset]);
+
+    // Remove from state
+    setDataset(null);
+  } catch (error) {
+    console.error('Error removing dataset:', error);
+    // Still remove from state even if cleanup fails
+    setDataset(null);
+  }
+}, [dataset, setDataset]);
 
   // Handle hypotheses change
-const handleHypothesesChange = useCallback((hypotheses: Hypothesis[]) => {
-    setNotebookState(prev => ({
-      ...prev,
-      hypotheses,
-    }));
-  }, []);
+  const handleHypothesesChange = useCallback((newHypotheses: Hypothesis[]) => {
+    setHypotheses(newHypotheses);
+  }, [setHypotheses]);
 
 // Handle AI code generation
 const handleGenerateCode = useCallback(async (cellId: string, query: string) => {
-    // Mark cell as generating
-    setNotebookState(prev => ({
-      ...prev,
-      cells: prev.cells.map(c =>
-        c.id === cellId ? { ...c, isGenerating: true, query } : c
-      ),
-    }));
-  
-    try {
-      const response = await fetch('/api/generate-code', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          query,
-          datasetInfo: notebookState.dataset?.summary,
-        }),
-      });
-  
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to generate code');
-      }
-  
-      const data = await response.json();
-  
-      // Update cell with generated code
-      setNotebookState(prev => ({
-        ...prev,
-        cells: prev.cells.map(c =>
-          c.id === cellId
-            ? {
-                ...c,
-                content: data.code,
-                query,
-                isGenerating: false,
-              }
-            : c
-        ),
-      }));
-    } catch (error: any) {
-      console.error('Code generation error:', error);
-      // Update cell with error
-      setNotebookState(prev => ({
-        ...prev,
-        cells: prev.cells.map(c =>
-          c.id === cellId
-            ? {
-                ...c,
-                isGenerating: false,
-                error: error.message || 'Failed to generate code',
-              }
-            : c
-        ),
-      }));
+  // Mark cell as generating
+  updateCellInStore(cellId, { isGenerating: true, query });
+
+  try {
+    const response = await fetch('/api/generate-code', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        query,
+        datasetInfo: dataset?.summary,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to generate code');
     }
-  }, [notebookState.dataset]);
+
+    const data = await response.json();
+
+    // Update cell with generated code
+    updateCellInStore(cellId, {
+      content: data.code,
+      query,
+      isGenerating: false,
+    });
+  } catch (error: any) {
+    console.error('Code generation error:', error);
+    // Update cell with error
+    updateCellInStore(cellId, {
+      isGenerating: false,
+      error: error.message || 'Failed to generate code',
+    });
+  }
+}, [dataset, updateCellInStore]);
 
   // Handle updating hypothesis tags for a cell
-const handleUpdateCellHypothesisTags = useCallback((cellId: string, tags: string[]) => {
-    setNotebookState(prev => ({
-      ...prev,
-      cells: prev.cells.map(c =>
-        c.id === cellId ? { ...c, hypothesisTags: tags } : c
-      ),
-    }));
-  }, []);
+  const handleUpdateCellHypothesisTags = useCallback((cellId: string, tags: string[]) => {
+    updateCellInStore(cellId, { hypothesisTags: tags });
+  }, [updateCellInStore]);
 
 // Handle adding insight
 const handleAddInsight = useCallback((cellId: string, content: string, tagId: string, hypothesisTags?: string[]) => {
-    const newInsight: Insight = {
-      id: `insight-${Date.now()}`,
-      cellId,
-      content,
-      tagId,
-      hypothesisTags: hypothesisTags || [],
-      createdAt: new Date(),
-    };
-  
-    setNotebookState(prev => ({
-      ...prev,
-      insights: [...prev.insights, newInsight],
-    }));
-  }, []);
-  
+  const newInsight: Insight = {
+    id: `insight-${Date.now()}`,
+    cellId,
+    content,
+    tagId,
+    hypothesisTags: hypothesisTags || [],
+    createdAt: new Date(),
+  };
+
+  addInsightToStore(newInsight);
+}, [addInsightToStore]);
+
+
   // Handle deleting insight
   const handleDeleteInsight = useCallback((insightId: string) => {
-    setNotebookState(prev => ({
-      ...prev,
-      insights: prev.insights.filter(i => i.id !== insightId),
-    }));
-  }, []);
+    removeInsightFromStore(insightId);
+  }, [removeInsightFromStore]);
   
 // Handle updating insight
 const handleUpdateInsight = useCallback((insightId: string, content: string, tagId: string, hypothesisTags?: string[]) => {
-    setNotebookState(prev => ({
-      ...prev,
-      insights: prev.insights.map(i =>
-        i.id === insightId ? { ...i, content, tagId, hypothesisTags: hypothesisTags || [] } : i
-      ),
-    }));
-  }, []);
+  updateInsightInStore(insightId, { content, tagId, hypothesisTags: hypothesisTags || [] });
+}, [updateInsightInStore]);
   
   // Handle adding new tag
   const handleAddTag = useCallback((name: string, color: string) => {
@@ -713,36 +647,30 @@ const handleUpdateInsight = useCallback((insightId: string, content: string, tag
       color,
     };
   
-    setNotebookState(prev => ({
-      ...prev,
-      tags: [...prev.tags, newTag],
-    }));
+    addTagToStore(newTag);
   
     return newTag.id;
-  }, []);
+  }, [addTagToStore]);
 
 // Handle opening insight - create blank insight in edit mode in panel
 const handleOpenInsightModal = useCallback((cellId: string) => {
-
   // Find the cell to get its plot output
-  const cell = notebookState.cells.find(c => c.id === cellId);
+  const cell = cells.find(c => c.id === cellId);
   const plotThumbnail = cell?.output?.plot || undefined;
 
-    const newInsight: Insight = {
-      id: `insight-${Date.now()}`,
-      cellId,
-      content: '',
-      tagId: '', // Empty tagId means it's in "new/edit" mode
-      hypothesisTags: [],
-      plotThumbnail,
-      createdAt: new Date(),
-    };
-    
-    setNotebookState(prev => ({
-      ...prev,
-      insights: [newInsight, ...prev.insights], // Add at the beginning
-    }));
-  },  [notebookState.cells]);
+  const newInsight: Insight = {
+    id: `insight-${Date.now()}`,
+    cellId,
+    content: '',
+    tagId: '', // Empty tagId means it's in "new/edit" mode
+    hypothesisTags: [],
+    plotThumbnail,
+    createdAt: new Date(),
+  };
+  
+  // Add at the beginning
+  setInsights([newInsight, ...insights]);
+}, [cells, insights, setInsights]);
   
   // Handle closing insight modal
   const handleCloseInsightModal = useCallback(() => {
@@ -751,43 +679,39 @@ const handleOpenInsightModal = useCallback((cellId: string) => {
 
 // Handle saving insight from modal
 const handleSaveInsight = useCallback((content: string, tagId: string, hypothesisTags: string[]) => {
-    if (insightModal.cellId) {
-      const cell = notebookState.cells.find(c => c.id === insightModal.cellId);
-      const plotThumbnail = cell?.output?.plot || undefined;
-      
-      const newInsight: Insight = {
-        id: `insight-${Date.now()}`,
-        cellId: insightModal.cellId,
-        content,
-        tagId,
-        hypothesisTags,
-        plotThumbnail, // ADD THIS LINE
-        createdAt: new Date(),
-      };
+  if (insightModal.cellId) {
+    const cell = cells.find(c => c.id === insightModal.cellId);
+    const plotThumbnail = cell?.output?.plot || undefined;
     
-      setNotebookState(prev => ({
-        ...prev,
-        insights: [...prev.insights, newInsight],
-      }));
-      
-      handleCloseInsightModal();
-    }
-  }, [insightModal.cellId, notebookState.cells, handleCloseInsightModal]);
+    const newInsight: Insight = {
+      id: `insight-${Date.now()}`,
+      cellId: insightModal.cellId,
+      content,
+      tagId,
+      hypothesisTags,
+      plotThumbnail,
+      createdAt: new Date(),
+    };
+  
+    addInsightToStore(newInsight);
+    handleCloseInsightModal();
+  }
+}, [insightModal.cellId, cells, addInsightToStore, handleCloseInsightModal]);
 
   // Listen for minimap section clicks
-useEffect(() => {
+  useEffect(() => {
     const handleHighlight = (e: CustomEvent) => {
       const { sectionId } = e.detail;
       
       // Check if it's a cell
-      const cell = notebookState.cells.find(c => c.id === sectionId);
+      const cell = cells.find(c => c.id === sectionId);
       if (cell) {
         selectCell(cell.id);
         return;
       }
       
       // Check if it's an insight
-      const insight = notebookState.insights.find(i => i.id === sectionId);
+      const insight = insights.find(i => i.id === sectionId);
       if (insight) {
         setHighlightedInsightId(insight.id);
         setTimeout(() => setHighlightedInsightId(null), 2000);
@@ -796,7 +720,7 @@ useEffect(() => {
     
     window.addEventListener('highlight-section', handleHighlight as EventListener);
     return () => window.removeEventListener('highlight-section', handleHighlight as EventListener);
-  }, [notebookState.cells, notebookState.insights, selectCell]);
+  }, [cells, insights, selectCell]);
   
 
   return (
@@ -805,7 +729,7 @@ useEffect(() => {
 <div className="flex items-center gap-2 p-2 bg-white border-b border-gray-200">
   <Button
     onClick={executeAllCells}
-    disabled={notebookState.isExecutingAll}
+    disabled={isExecutingAll}
     size="sm"
     className="flex items-center gap-1"
   >
@@ -846,7 +770,7 @@ useEffect(() => {
     className="w-full flex items-center justify-between p-2 bg-gray-100 hover:bg-gray-200 rounded-t border border-gray-300 transition-colors"
   >
     <span className="text-sm font-semibold text-gray-700">
-      Dataset {notebookState.dataset && `- ${notebookState.dataset.filename}`}
+      Dataset {dataset && `- ${dataset.filename}`}
     </span>
     <span className="text-gray-600">
       {isDatasetCollapsed ? '▼' : '▲'}
@@ -855,7 +779,7 @@ useEffect(() => {
   {!isDatasetCollapsed && (
     <div className="border border-t-0 border-gray-300 rounded-b">
       <DatasetSection
-        dataset={notebookState.dataset}
+        dataset={dataset}
         onDatasetUpload={handleDatasetUpload}
         onDatasetRemove={handleDatasetRemove}
       />
@@ -870,7 +794,7 @@ useEffect(() => {
     className="w-full flex items-center justify-between p-2 bg-purple-100 hover:bg-purple-200 rounded-t border border-purple-300 transition-colors"
   >
     <span className="text-sm font-semibold text-purple-700">
-      Research Hypotheses {notebookState.hypotheses.length > 0 && `(${notebookState.hypotheses.length})`}
+      Research Hypotheses {hypotheses.length > 0 && `(${hypotheses.length})`}
     </span>
     <span className="text-purple-700">
       {isHypothesesCollapsed ? '▼' : '▲'}
@@ -879,7 +803,7 @@ useEffect(() => {
   {!isHypothesesCollapsed && (
     <div className="border border-t-0 border-purple-300 rounded-b">
       <HypothesisSection
-        hypotheses={notebookState.hypotheses}
+        hypotheses={hypotheses}
         onHypothesesChange={handleHypothesesChange}
       />
     </div>
@@ -887,7 +811,7 @@ useEffect(() => {
 </div>
 
 {/* Hypothesis Filter for Notebook */}
-{notebookState.hypotheses.length > 0 && (
+{hypotheses.length > 0 && (
   <div className="mb-4 bg-white border border-gray-300 rounded-lg p-3">
     <div className="flex items-center justify-between">
       <h3 className="text-sm font-semibold text-gray-700">Filter Code Cells</h3>
@@ -922,7 +846,7 @@ useEffect(() => {
 
         <p className="text-xs font-semibold text-gray-600 mb-2">Show cells linked to:</p>
         <div className="space-y-1">
-          {notebookState.hypotheses.map((hyp, index) => (
+          {hypotheses.map((hyp, index) => (
             <label key={hyp.id} className="flex items-center gap-2 text-xs cursor-pointer hover:bg-white p-1 rounded">
               <input
                 type="checkbox"
@@ -957,13 +881,13 @@ useEffect(() => {
 
     {notebookHypothesisFilter.length > 0 && (
       <p className="text-xs text-gray-500 mt-2">
-        Showing {filteredCells.length} of {notebookState.cells.length} code cells
+        Showing {filteredCells.length} of {cells.length} code cells
       </p>
     )}
   </div>
 )}
 
-{notebookState.cells.length === 0 ? (
+{cells.length === 0 ? (
   <div className="text-center py-20 text-gray-500">
     <Plus size={48} className="mx-auto mb-4 opacity-30" />
     <p>No cells yet. Click "Add Cell" to start coding!</p>
@@ -989,7 +913,7 @@ useEffect(() => {
         >
           <CodeCell
             cell={cell}
-            isSelected={notebookState.selectedCellId === cell.id}
+            isSelected={selectedCellId === cell.id}
             isHighlighted={highlightedCellId === cell.id}
             onExecute={executeCell}
             onDelete={deleteCell}
@@ -1002,10 +926,10 @@ useEffect(() => {
             onGenerateCode={handleGenerateCode}
             onAddInsight={handleOpenInsightModal}
             onUpdateHypothesisTags={handleUpdateCellHypothesisTags}
-            hypotheses={notebookState.hypotheses}
+            hypotheses={hypotheses}
             canMoveUp={index > 0}
             canMoveDown={index < filteredCells.length - 1}
-            datasetInfo={notebookState.dataset?.summary}
+            datasetInfo={dataset?.summary}
           />
         </div>
       ))
@@ -1038,7 +962,7 @@ style={{ width: '400px', minWidth: '350px', flexShrink: 0 }}
   </div>
   
   <p className="text-xs text-gray-500">
-    {filteredInsights.length} of {notebookState.insights.length} insight{notebookState.insights.length !== 1 ? 's' : ''}
+    {filteredInsights.length} of {insights.length} insight{insights.length !== 1 ? 's' : ''}
   </p>
 
 {/* Filter Dropdown */}
@@ -1056,7 +980,7 @@ style={{ width: '400px', minWidth: '350px', flexShrink: 0 }}
     </button>
 
     {/* Hypothesis Filters */}
-    {notebookState.hypotheses.length > 0 && (
+    {hypotheses.length > 0 && (
       <div className="mb-3">
         <button
           onClick={() => setInsightFilterSections(prev => ({ ...prev, hypotheses: !prev.hypotheses }))}
@@ -1075,7 +999,7 @@ style={{ width: '400px', minWidth: '350px', flexShrink: 0 }}
         
         {insightFilterSections.hypotheses && (
           <div className="space-y-1">
-            {notebookState.hypotheses.map((hyp, index) => (
+            {hypotheses.map((hyp, index) => (
               <label key={hyp.id} className="flex items-center gap-2 text-xs cursor-pointer hover:bg-gray-50 p-1 rounded">
                 <input
                   type="checkbox"
@@ -1107,7 +1031,7 @@ style={{ width: '400px', minWidth: '350px', flexShrink: 0 }}
     )}
 
     {/* Tag Filters */}
-    {notebookState.tags.length > 0 && (
+    {tags.length > 0 && (
       <div>
         <button
           onClick={() => setInsightFilterSections(prev => ({ ...prev, tags: !prev.tags }))}
@@ -1126,7 +1050,7 @@ style={{ width: '400px', minWidth: '350px', flexShrink: 0 }}
         
         {insightFilterSections.tags && (
           <div className="space-y-1">
-            {notebookState.tags.map((tag) => (
+            {tags.map((tag) => (
               <label key={tag.id} className="flex items-center gap-2 text-xs cursor-pointer hover:bg-gray-50 p-1 rounded">
                 <input
                   type="checkbox"
@@ -1175,13 +1099,13 @@ style={{ width: '400px', minWidth: '350px', flexShrink: 0 }}
 <div className="space-y-3">
   {filteredInsights.length === 0 ? (
     <p className="text-sm text-gray-500 text-center py-8">
-      {notebookState.insights.length === 0 
+      {insights.length === 0 
         ? "No insights yet. Run code and click \"+ Add Insight\" to create insights."
         : "No insights match the current filters."}
     </p>
   ) : (
     filteredInsights.map((insight) => {
-      const tag = notebookState.tags.find(t => t.id === insight.tagId);
+      const tag = tags.find(t => t.id === insight.tagId);
       
       return (
         <div
@@ -1199,8 +1123,8 @@ style={{ width: '400px', minWidth: '350px', flexShrink: 0 }}
             onAddTag={handleAddTag}
             onClick={() => handleInsightClick(insight.id, insight.cellId)}
             isHighlighted={highlightedInsightId === insight.id}
-            allTags={notebookState.tags}
-            hypotheses={notebookState.hypotheses}
+            allTags={tags}
+            hypotheses={hypotheses}
           />
         </div>
       );
