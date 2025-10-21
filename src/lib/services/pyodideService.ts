@@ -26,7 +26,12 @@ class PyodideService {
           indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.24.1/full/',
         });
 
-        await this.pyodide.loadPackage(['numpy', 'pandas', 'matplotlib']);
+        await this.pyodide.loadPackage([  'numpy',
+          'pandas', 
+          'matplotlib',
+          'scipy',
+          'statsmodels',
+          'scikit-learn']);
         
         // Configure matplotlib to use non-interactive backend
         await this.pyodide.runPythonAsync(`

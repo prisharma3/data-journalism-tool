@@ -174,6 +174,14 @@ const [isHypothesesCollapsed, setIsHypothesesCollapsed] = useState(false);
 const [notebookHypothesisFilter, setNotebookHypothesisFilter] = useState<string[]>([]);
 const [showNotebookFilter, setShowNotebookFilter] = useState(false);
 
+// Add these state variables after the existing ones (around line 50-100)
+const [insightsPanelWidth, setInsightsPanelWidth] = useState(400);
+const [isResizingInsights, setIsResizingInsights] = useState(false);
+
+// Min/Max constraints for insights panel
+const INSIGHTS_MIN = 300;
+const INSIGHTS_MAX = 600;
+
 // Filter cells based on selected hypothesis filter
 const filteredCells = useMemo(() => {
   if (notebookHypothesisFilter.length === 0) {
@@ -336,6 +344,42 @@ useEffect(() => {
     
     preloadPyodide();
   }, []);
+
+  // Handle insights panel resize
+useEffect(() => {
+  const handleMouseMove = (e: MouseEvent) => {
+    if (isResizingInsights) {
+      const container = notebookScrollRef.current?.parentElement;
+      if (container) {
+        const containerRect = container.getBoundingClientRect();
+        const newWidth = containerRect.right - e.clientX;
+        
+        // Apply constraints
+        if (newWidth >= INSIGHTS_MIN && newWidth <= INSIGHTS_MAX) {
+          setInsightsPanelWidth(newWidth);
+        }
+      }
+    }
+  };
+
+  const handleMouseUp = () => {
+    setIsResizingInsights(false);
+  };
+
+  if (isResizingInsights) {
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  }
+
+  return () => {
+    document.removeEventListener('mousemove', handleMouseMove);
+    document.removeEventListener('mouseup', handleMouseUp);
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+  };
+}, [isResizingInsights]);
 
   // Add new cell
   const addCell = useCallback((afterCellId?: string, position?: 'above' | 'below') => {
@@ -760,8 +804,12 @@ const handleSaveInsight = useCallback((content: string, tagId: string, hypothesi
 
 {/* Two Column Layout: Notebook + Insights */}
 <div className="flex-1 flex overflow-hidden">
-{/* Left Column: Notebook Content */}
-<div ref={notebookScrollRef} className="flex-1 overflow-y-auto p-4">
+  {/* Left Column: Notebook Content - Resizable */}
+  <div 
+    ref={notebookScrollRef} 
+    className="overflow-y-auto p-4 flex-shrink-0"
+    style={{ width: `calc(100% - ${insightsPanelWidth}px - 1px)` }}
+  >
 
 {/* Dataset Upload Section */}
 <div id="section-dataset" className="mb-4">
@@ -937,10 +985,28 @@ const handleSaveInsight = useCallback((content: string, tagId: string, hypothesi
   </div>
 
 {/* Right Column: Insights Margin */}
+{/* Resize Handle */}
+<div
+  className="w-1 bg-gray-300 hover:bg-blue-500 cursor-col-resize flex-shrink-0 transition-colors relative group"
+  onMouseDown={() => setIsResizingInsights(true)}
+>
+  <div className="absolute inset-0 flex items-center justify-center">
+    <svg 
+      className="w-3 h-3 text-gray-500 opacity-0 group-hover:opacity-100 transition-opacity" 
+      fill="none" 
+      stroke="currentColor" 
+      viewBox="0 0 24 24"
+    >
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l4-4 4 4m0 6l-4 4-4-4" />
+    </svg>
+  </div>
+</div>
+
+{/* Right Column: Insights Panel - Resizable */}
 <div 
-ref={insightsScrollRef}
-className="bg-gray-100 border-l border-gray-300 overflow-y-auto p-4"
-style={{ width: '400px', minWidth: '350px', flexShrink: 0 }}
+  ref={insightsScrollRef}
+  className="bg-gray-100 border-l border-gray-300 overflow-y-auto p-4 flex-shrink-0"
+  style={{ width: `${insightsPanelWidth}px` }}
 >
 <div className="sticky top-0 mb-4 pb-2 bg-gray-100 z-10 border-b border-gray-300">
   <div className="flex items-center justify-between mb-2">

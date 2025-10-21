@@ -3,8 +3,9 @@
 import { useState } from 'react';
 
 interface MinimapProps {
-  sections: MinimapSection[];
-  onSectionClick: (sectionId: string) => void;
+  projectId: string;
+  sections?: MinimapSection[];
+  onSectionClick?: (sectionId: string) => void;
 }
 
 export interface MinimapSection {
@@ -16,68 +17,73 @@ export interface MinimapSection {
   height: number;
 }
 
-export default function Minimap({ sections, onSectionClick }: MinimapProps) {
+export default function Minimap({ projectId, sections = [], onSectionClick }: MinimapProps) {
   const [hoveredSection, setHoveredSection] = useState<string | null>(null);
 
   const getSectionTypeLabel = (type: string) => {
     switch (type) {
-      case 'dataset': return 'DATASET';
-      case 'hypothesis': return 'HYPOTHESIS';
+      case 'dataset': return 'DATA';
+      case 'hypothesis': return 'H';
       case 'analysis': return 'ANALYSIS';
       case 'insight': return 'INSIGHT';
       default: return type.toUpperCase();
     }
   };
 
+  const handleSectionClick = (sectionId: string) => {
+    if (onSectionClick) {
+      onSectionClick(sectionId);
+    }
+    // Scroll to section
+    const element = document.getElementById(sectionId);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
   return (
-    <div className="h-full flex flex-col bg-white">
+    <div className="h-full flex flex-col bg-gray-50 border-r border-gray-200">
       {/* Header */}
-      <div className="p-3 border-b border-gray-200 flex-shrink-0">
-        <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wide">
-          Notebook Overview
+      <div className="p-2 border-b border-gray-200 flex-shrink-0">
+        <h3 className="text-[10px] font-bold text-gray-700 uppercase tracking-wide">
+          Map
         </h3>
-        <p className="text-[10px] text-gray-500 mt-0.5">
-          {sections.length} section{sections.length !== 1 ? 's' : ''}
-        </p>
       </div>
 
       {/* Scrollable Section List */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto py-2">
         {sections.length === 0 ? (
-          <div className="p-4 text-center">
-            <div className="text-xs text-gray-400">No sections yet</div>
-            <div className="text-[10px] text-gray-400 mt-1">Start adding content</div>
+          <div className="px-2 text-center mt-8">
+            <div className="text-[10px] text-gray-400">Empty</div>
           </div>
         ) : (
-          <div className="py-2">
+          <div className="space-y-1">
             {sections.map((section) => (
               <button
                 key={section.id}
-                className="w-full text-left px-3 py-2 hover:bg-gray-50 transition-colors flex items-start gap-2 group"
-                onClick={() => onSectionClick(section.id)}
+                className="w-full text-left px-2 py-1.5 hover:bg-gray-100 transition-colors flex items-center gap-1.5 group"
+                onClick={() => handleSectionClick(section.id)}
                 onMouseEnter={() => setHoveredSection(section.id)}
                 onMouseLeave={() => setHoveredSection(null)}
+                title={section.title}
               >
-                {/* Colored Line Indicator */}
+                {/* Colored Indicator */}
                 <div 
-                  className="w-1 rounded-full mt-1 flex-shrink-0"
+                  className="w-0.5 rounded-full flex-shrink-0"
                   style={{ 
                     backgroundColor: section.color,
-                    height: '20px',
-                    minHeight: '20px'
+                    height: '16px',
                   }}
                 />
                 
-                {/* Text Content */}
+                {/* Type Label */}
                 <div className="flex-1 min-w-0">
-                  <div className="text-[9px] font-semibold uppercase tracking-wide text-gray-400">
-                    {getSectionTypeLabel(section.type)}
-                  </div>
                   <div 
-                    className="text-xs text-gray-700 truncate mt-0.5 group-hover:text-blue-600"
-                    title={section.title}
+                    className={`text-[9px] font-medium truncate transition-colors ${
+                      hoveredSection === section.id ? 'text-blue-600' : 'text-gray-600'
+                    }`}
                   >
-                    {section.title}
+                    {getSectionTypeLabel(section.type)}
                   </div>
                 </div>
               </button>
