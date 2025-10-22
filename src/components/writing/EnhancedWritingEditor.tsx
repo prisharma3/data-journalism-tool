@@ -97,74 +97,82 @@ const handleContentChange = (newContent: string, newPos?: number) => {
         const newText = 
           content.substring(0, claim.position.from) +
           content.substring(claim.position.to);
-  
+      
         // Mark this position as fixed
         setFixedPositions(prev => [...prev, {
           from: claim.position.from,
           to: claim.position.from,
           fixedAt: new Date()
         }]);
-  
+      
         // Update content
         setContent(newText);
         if (onContentChange) {
           onContentChange(newText);
         }
-  
-        // Dismiss the suggestion
-        setDismissedSuggestions(prev => new Set([...prev, suggestionId]));
+      
+        // CRITICAL FIX: Dismiss ALL suggestions for this claim
+        const claimSuggestions = suggestions
+          .filter(s => s.claimId === claim.id)
+          .map(s => s.id);
+        
+        setDismissedSuggestions(prev => new Set([...prev, ...claimSuggestions]));
       }
       return;
     }
   
     // Handle ADD ANALYSIS
-    if (suggestion.type === 'add-analysis') {
-      // If already expanded, collapse it
-      if (expandedSuggestionId === suggestionId) {
-        setExpandedSuggestionId(null);
-        return;
-      }
-  
-      // Expand and fetch analysis suggestions
-      setExpandedSuggestionId(suggestionId);
-      
-      const claim = claims.find(c => c.id === suggestion.claimId);
-      if (claim) {
-        try {
-          // If we already have a suggested query in metadata, use it
-          if (suggestion.metadata?.suggestedQuery) {
-            // Create a single analysis suggestion from the metadata
-            const analysisSuggestion = {
-              title: `Analyze: ${suggestion.metadata.missingConcepts?.join(', ') || 'Evidence'}`,
-              naturalLanguageQuery: suggestion.metadata.suggestedQuery,
-              explanation: suggestion.explanation || 'Run this analysis to support your claim',
-              expectedOutput: 'Data visualization and statistical results',
-              priority: 'high' as const,
-              estimatedComplexity: 'simple' as const,
-              fillsGaps: [suggestion.metadata.gapType || 'missing-evidence'],
-            };
-  
-            setAnalysisSuggestions(prev => ({
-              ...prev,
-              [suggestionId]: [analysisSuggestion]
-            }));
-          } else {
-            // Fallback: Use the suggestAnalyses API
-            const result = await suggestAnalyses(claim.text, []);
-            console.log('Analysis suggestions:', result.suggestions);
-            
-            setAnalysisSuggestions(prev => ({
-              ...prev,
-              [suggestionId]: result.suggestions || []
-            }));
-          }
-        } catch (err) {
-          console.error('Failed to suggest analyses:', err);
-          alert('Failed to generate analysis suggestions. Please try again.');
-        }
-      }
+// Handle ADD ANALYSIS
+if (suggestion.type === 'add-analysis') {
+    // If already expanded, collapse it
+    if (expandedSuggestionId === suggestionId) {
+      setExpandedSuggestionId(null);
       return;
     }
+  
+    // Expand and fetch analysis suggestions
+    setExpandedSuggestionId(suggestionId);
+    
+    const claim = claims.find(c => c.id === suggestion.claimId);
+    if (claim) {
+      try {
+        // If we already have a suggested query in metadata, use it
+        if (suggestion.metadata?.suggestedQuery) {
+          // Create a single analysis suggestion from the metadata
+          const analysisSuggestion = {
+            title: `Analyze: ${suggestion.metadata.missingConcepts?.join(', ') || 'Evidence'}`,
+            naturalLanguageQuery: suggestion.metadata.suggestedQuery,
+            explanation: suggestion.explanation || 'Run this analysis to support your claim',
+            expectedOutput: 'Data visualization and statistical results',
+            priority: 'high' as const,
+            estimatedComplexity: 'simple' as const,
+            fillsGaps: [suggestion.metadata.gapType || 'missing-evidence'],
+          };
+  
+          setAnalysisSuggestions(prev => ({
+            ...prev,
+            [suggestionId]: [analysisSuggestion]
+          }));
+          
+          console.log('Analysis suggestions set for:', suggestionId);
+        } else {
+          // Fallback: Use the suggestAnalyses API
+          const result = await suggestAnalyses(claim.text, []);
+          
+          setAnalysisSuggestions(prev => ({
+            ...prev,
+            [suggestionId]: result.suggestions || []
+          }));
+          
+          console.log('Total suggestions collected:', result.suggestions?.length || 0);
+        }
+      } catch (err) {
+        console.error('Failed to suggest analyses:', err);
+        alert('Failed to generate analysis suggestions. Please try again.');
+      }
+    }
+    return;
+  }
   
     // Handle MODIFICATION SUGGESTIONS (weaken, caveat, etc.)
     // If already expanded with modifications, collapse it
@@ -232,16 +240,21 @@ const handleContentChange = (newContent: string, newPos?: number) => {
   };
 
   const handleClaimClick = (claimId: string) => {
-    // Toggle highlight
-    setHighlightedClaimId(prev => prev === claimId ? null : claimId);
+    console.log('Claim clicked:', claimId);
+    
+    // Always set highlight (don't toggle)
+    setHighlightedClaimId(claimId);
     
     // Find and scroll to the suggestion for this claim
     const suggestionForClaim = suggestions.find(s => s.claimId === claimId);
+    console.log('Found suggestion:', suggestionForClaim?.id);
+    
     if (suggestionForClaim) {
-      // Scroll suggestion into view
       const suggestionElement = document.getElementById(`suggestion-${suggestionForClaim.id}`);
+      console.log('Found element:', suggestionElement ? 'yes' : 'no');
+      
       if (suggestionElement) {
-        suggestionElement.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        suggestionElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
     }
   };
@@ -320,6 +333,42 @@ const handleContentChange = (newContent: string, newPos?: number) => {
                 {claims.length} claim{claims.length !== 1 ? 's' : ''} detected • Click underlined text for details
               </div>
             )}
+
+            {/* Claim count indicator */}
+{claims.length > 0 && (
+  <div className="mt-4 text-sm text-gray-500 text-center">
+    {claims.length} claim{claims.length !== 1 ? 's' : ''} detected • Click underlined text for details
+  </div>
+)}
+
+{/* Underline legend */}
+{claims.length > 0 && (
+  <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+    <p className="text-xs font-semibold text-gray-700 mb-2">Underline Colors:</p>
+    <div className="grid grid-cols-2 gap-2 text-xs">
+      <div className="flex items-center gap-2">
+        <span className="underline decoration-green-500 decoration-2">Green</span>
+        <span className="text-gray-600">- No issues</span>
+      </div>
+      <div className="flex items-center gap-2">
+        <span className="underline decoration-blue-500 decoration-2">Blue</span>
+        <span className="text-gray-600">- Needs analysis</span>
+      </div>
+      <div className="flex items-center gap-2">
+        <span className="underline decoration-yellow-500 decoration-2">Yellow</span>
+        <span className="text-gray-600">- Weaken language</span>
+      </div>
+      <div className="flex items-center gap-2">
+        <span className="underline decoration-orange-500 decoration-2">Orange</span>
+        <span className="text-gray-600">- Add caveat</span>
+      </div>
+      <div className="flex items-center gap-2">
+        <span className="underline decoration-red-500 decoration-wavy decoration-2">Red wavy</span>
+        <span className="text-gray-600">- Remove claim</span>
+      </div>
+    </div>
+  </div>
+)}
           </div>
         </div>
 
@@ -382,6 +431,13 @@ highlightedClaimId={highlightedClaimId}
       fixedAt: new Date()
     }]);
     
+    // CRITICAL FIX: Dismiss ALL suggestions for this claim
+    const claimSuggestions = suggestions
+      .filter(s => s.claimId === claim.id)
+      .map(s => s.id);
+    
+    setDismissedSuggestions(prev => new Set([...prev, ...claimSuggestions]));
+    
     // Update content
     setContent(newText);
     if (onContentChange) {
@@ -389,9 +445,6 @@ highlightedClaimId={highlightedClaimId}
     }
     
     setExpandedSuggestionId(null);
-    
-    // Let TextWithClaims re-render with new content
-    // The contentEditable div will update automatically
   }}
 />
     </div>

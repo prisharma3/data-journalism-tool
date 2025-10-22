@@ -45,8 +45,13 @@ export function useClaimEvaluation({
         sameAsLast: text === lastTextRef.current 
       });
       
-      if (!enabled || !text || text === lastTextRef.current) {
-        console.log('❌ Skipping detection');
+      if (!enabled) {
+        console.log('❌ Detection disabled');
+        return;
+      }
+      
+      if (!text || text === lastTextRef.current) {
+        console.log('❌ No text or same text');
         return;
       }
       

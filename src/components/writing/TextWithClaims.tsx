@@ -1,10 +1,10 @@
 /**
- * TEXT WITH CLAIMS COMPONENT
+ * TEXT WITH CLAIMS COMPONENT - FIXED
  * Renders text with claim underlines - now supports editing
- * FIXED: Underlines are now inline with text, not in overlay
+ * FIXED: removeChild error by preventing React DOM conflicts
  */
 
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { ClaimStructure, WritingSuggestion } from '@/types/writing';
 
 interface TextWithClaimsProps {
@@ -28,6 +28,7 @@ export function TextWithClaims({
 }: TextWithClaimsProps) {
   const editorRef = useRef<HTMLDivElement>(null);
   const isComposingRef = useRef(false);
+  const [isUpdating, setIsUpdating] = useState(false);
 
   // Sort claims by position (earliest first)
   const sortedClaims = [...claims].sort((a, b) => a.position.from - b.position.from);
@@ -105,7 +106,7 @@ export function TextWithClaims({
 
   // Handle content changes in editable mode
   const handleInput = () => {
-    if (!isEditable || !editorRef.current || !onContentChange) return;
+    if (!isEditable || !editorRef.current || !onContentChange || isUpdating) return;
     
     const newText = editorRef.current.innerText;
     const selection = window.getSelection();
@@ -120,102 +121,116 @@ export function TextWithClaims({
     
     const currentText = editorRef.current.innerText;
     if (currentText !== text) {
+      // Prevent recursive updates
+      setIsUpdating(true);
+      
       // Save cursor position
       const selection = window.getSelection();
-      const range = selection?.getRangeAt(0);
-      const cursorOffset = range?.startOffset || 0;
+      let cursorOffset = 0;
+      
+      if (selection && selection.rangeCount > 0) {
+        const range = selection.getRangeAt(0);
+        cursorOffset = range.startOffset;
+      }
       
       // Update will happen via re-render
+      // The cursor restoration will happen after the render
       
-      // Restore cursor after render
-      setTimeout(() => {
-        if (editorRef.current && selection) {
+      // Schedule cursor restoration after DOM update
+      requestAnimationFrame(() => {
+        if (editorRef.current) {
           try {
-            const newRange = document.createRange();
             const textNode = editorRef.current.firstChild;
-            if (textNode) {
-              newRange.setStart(textNode, Math.min(cursorOffset, textNode.textContent?.length || 0));
-              newRange.collapse(true);
-              selection.removeAllRanges();
-              selection.addRange(newRange);
+            if (textNode && textNode.nodeType === Node.TEXT_NODE) {
+              const range = document.createRange();
+              const sel = window.getSelection();
+              const offset = Math.min(cursorOffset, textNode.textContent?.length || 0);
+              
+              range.setStart(textNode, offset);
+              range.collapse(true);
+              sel?.removeAllRanges();
+              sel?.addRange(range);
             }
           } catch (e) {
-            console.error('Failed to restore cursor:', e);
+            // Ignore cursor restoration errors
+            console.warn('Could not restore cursor:', e);
           }
         }
-      }, 0);
+        setIsUpdating(false);
+      });
     }
   }, [text, isEditable]);
 
-  if (isEditable) {
+  // Composition event handlers for IME input
+  const handleCompositionStart = () => {
+    isComposingRef.current = true;
+  };
+
+  const handleCompositionEnd = () => {
+    isComposingRef.current = false;
+    handleInput();
+  };
+
+  if (!isEditable) {
+    // Non-editable view with underlines
     return (
-      <div
-        ref={editorRef}
-        contentEditable
-        onInput={handleInput}
-        onCompositionStart={() => { isComposingRef.current = true; }}
-        onCompositionEnd={() => { 
-          isComposingRef.current = false;
-          handleInput();
-        }}
-        className="w-full min-h-[calc(100vh-200px)] p-6 text-base leading-relaxed focus:outline-none font-serif whitespace-pre-wrap"
-        style={{
-          lineHeight: '1.8',
-          fontSize: '16px',
-        }}
-        suppressContentEditableWarning
-      >
-{segments.map((segment, index) => {
-  if (segment.claim) {
-    const isHighlighted = highlightedClaimId === segment.claim.id;
-    return (
-<span
-  key={index}
-  data-claim-id={segment.claim.id}
-  className={`underline underline-offset-4 cursor-pointer transition-all ${
-    isHighlighted 
-      ? 'bg-yellow-200 ring-2 ring-yellow-400' 
-      : 'hover:bg-gray-100'
-  } ${getUnderlineClass(segment.claim)}`}
-  onClick={(e) => {
-    e.preventDefault();
-    onClaimClick(segment.claim!.id);
-  }}
-  title={getTooltip(segment.claim)}
->
-        {segment.text}
-      </span>
-    );
-  }
-  return <React.Fragment key={index}>{segment.text}</React.Fragment>;
-})}
+      <div className="prose max-w-none">
+        {segments.map((segment, index) => {
+          if (segment.claim) {
+            const isHighlighted = highlightedClaimId === segment.claim.id;
+            return (
+              <span
+                key={index}
+                className={`underline underline-offset-4 ${getUnderlineClass(segment.claim)} cursor-pointer hover:bg-gray-100 transition-colors ${
+                  isHighlighted ? 'bg-yellow-100 ring-2 ring-yellow-400' : ''
+                }`}
+                onClick={() => onClaimClick(segment.claim!.id)}
+                title={getTooltip(segment.claim)}
+              >
+                {segment.text}
+              </span>
+            );
+          }
+          return <span key={index}>{segment.text}</span>;
+        })}
       </div>
     );
   }
 
-  // Read-only mode
+  // Editable view
   return (
-    <div className="whitespace-pre-wrap leading-relaxed font-serif">
-{segments.map((segment, index) => {
-  if (segment.claim) {
-    const isHighlighted = highlightedClaimId === segment.claim.id;
-    return (
-      <span
-        key={index}
-        className={`underline underline-offset-4 cursor-pointer transition-all ${
-          isHighlighted 
-            ? 'bg-yellow-200 ring-2 ring-yellow-400' 
-            : 'hover:bg-gray-100'
-        } ${getUnderlineClass(segment.claim)}`}
-        onClick={() => onClaimClick(segment.claim!.id)}
-        title={getTooltip(segment.claim)}
-      >
-        {segment.text}
-      </span>
-    );
-  }
-  return <span key={index}>{segment.text}</span>;
-})}
+    <div
+      ref={editorRef}
+      contentEditable={true}
+      suppressContentEditableWarning={true}
+      onInput={handleInput}
+      onCompositionStart={handleCompositionStart}
+      onCompositionEnd={handleCompositionEnd}
+      className="prose max-w-none outline-none min-h-[200px] focus:outline-none"
+      style={{ whiteSpace: 'pre-wrap' }}
+    >
+      {segments.map((segment, index) => {
+        if (segment.claim) {
+          const isHighlighted = highlightedClaimId === segment.claim.id;
+          return (
+            <span
+              key={`${segment.claim.id}-${index}`}
+              data-claim-id={segment.claim.id}
+              className={`underline underline-offset-4 ${getUnderlineClass(segment.claim)} cursor-pointer hover:bg-gray-100 transition-colors ${
+                isHighlighted ? 'bg-yellow-100 ring-2 ring-yellow-400' : ''
+              }`}
+              onClick={(e) => {
+                e.preventDefault();
+                onClaimClick(segment.claim!.id);
+              }}
+              title={getTooltip(segment.claim)}
+            >
+              {segment.text}
+            </span>
+          );
+        }
+        return <span key={`text-${index}`}>{segment.text}</span>;
+      })}
     </div>
   );
 }
