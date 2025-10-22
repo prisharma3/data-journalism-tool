@@ -45,22 +45,28 @@ export interface ClaimStructure {
     claimId: string;
     claim: string;
     
-    // Core components (always present)
     grounds: Evidence[];
     warrant: Warrant;
     
-    // Optional components
     backing: Backing[];
     qualifier: Qualifier | null;
     rebuttal: Rebuttal[];
     
-    // Overall assessment
     strength: ArgumentStrength;
-    overallScore: number; // 0-100
+    overallScore: number;
     issues: ArgumentIssue[];
     gaps: EvidenceGap[];
     
     evaluatedAt: Date;
+    
+    // NEW: Decision tree fields
+    recommendedAction?: 'claim-is-fine' | 'claim-needs-change' | 'claim-might-need-change';
+    actionReasoning?: string;
+    modificationPaths?: {
+      weaken?: string;
+      caveat?: string;
+      reverse?: string;
+    };
   }
   
   /**
@@ -207,11 +213,12 @@ export interface ClaimStructure {
    */
   export interface EvidenceGap {
     id: string;
-    type: GapType;
+    type: 'missing-variable' | 'missing-relationship' | 'confounding-variable' | 'temporal-issue' | 'fundamentally-unsupportable';
     description: string;
-    missingConcepts: string[]; // Concepts in claim but not in analysis
+    missingConcepts: string[];
     importance: 'critical' | 'important' | 'optional';
-    suggestedAnalysis?: AnalysisSuggestion; // What analysis would fill this gap
+    suggestedAnalysis?: string;
+    suggestedQuery?: string | null; // NEW: Specific query or null if unsupportable
   }
   
   export type GapType =
@@ -248,33 +255,35 @@ export interface ClaimStructure {
     id: string;
     claimId: string;
     type: SuggestionType;
-    severity: 'error' | 'warning' | 'info';
-    
-    // Display
-    message: string; // Short message shown in tooltip
-    explanation: string; // Detailed explanation
-    position: { from: number; to: number };
-    
-    // Actions
+    severity: 'critical' | 'warning' | 'info';
+    message: string;
+    explanation?: string;
+    position: { from: number; to: number; paragraphIndex: number };
     actions: SuggestionAction[];
-    priority: number; // For sorting, higher = more important
-    
-    // Tracking
+    priority: number;
     createdAt: Date;
-    status: 'active' | 'accepted' | 'dismissed' | 'expired';
+    status: 'active' | 'dismissed' | 'accepted';
+    
+    // NEW: Metadata for analysis and removal suggestions
+    metadata?: {
+      suggestedQuery?: string;
+      missingConcepts?: string[];
+      gapType?: string;
+      reason?: string;
+    };
   }
   
   export type SuggestionType =
-    | 'weaken-claim'          // Language too strong
-    | 'add-caveat'            // Need conditional language
-    | 'add-qualifier'         // Need "some", "many"
-    | 'remove-claim'          // Not supported at all
-    | 'reverse-claim'         // Evidence suggests opposite
-    | 'add-analysis'          // Need to do more analysis
-    | 'cite-evidence'         // Evidence exists, should reference it
-    | 'acknowledge-limitation' // Should mention limitations
-    | 'grammar'               // Grammar/style issue
-    | 'relevance';            // Relevant analysis available
+  | 'weaken-claim'
+  | 'add-caveat'
+  | 'add-qualifier'
+  | 'remove-claim'
+  | 'reverse-claim'
+  | 'add-analysis'
+  | 'cite-evidence'
+  | 'acknowledge-limitation'
+  | 'grammar'
+  | 'relevance';
   
   export interface SuggestionAction {
     id: string;

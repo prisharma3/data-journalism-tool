@@ -1,10 +1,10 @@
 /**
- * TOULMIN MODAL COMPONENT
- * Shows detailed Toulmin diagram and evaluation for a claim
+ * CLAIM FEEDBACK MODAL
+ * Shows evaluation and suggestions for a claim (Toulmin is internal only)
  */
 
 import React from 'react';
-import { X, AlertCircle, CheckCircle, Lightbulb } from 'lucide-react';
+import { X, AlertCircle, AlertTriangle, Info, CheckCircle, Lightbulb, TrendingUp } from 'lucide-react';
 import { ClaimStructure, WritingSuggestion } from '@/types/writing';
 
 interface ToulminModalProps {
@@ -28,6 +28,31 @@ export function ToulminModal({
 
   const claimSuggestions = suggestions.filter(s => s.claimId === claim.id);
 
+  // Get severity icon and color
+  const getSeverityDisplay = (severity: string) => {
+    switch (severity) {
+      case 'critical':
+        return { icon: AlertCircle, color: 'text-red-600', bgColor: 'bg-red-50', borderColor: 'border-red-200' };
+      case 'warning':
+        return { icon: AlertTriangle, color: 'text-orange-600', bgColor: 'bg-orange-50', borderColor: 'border-orange-200' };
+      case 'info':
+        return { icon: Info, color: 'text-blue-600', bgColor: 'bg-blue-50', borderColor: 'border-blue-200' };
+      default:
+        return { icon: Info, color: 'text-gray-600', bgColor: 'bg-gray-50', borderColor: 'border-gray-200' };
+    }
+  };
+
+  // Get strength color
+  const getStrengthColor = (strength: string) => {
+    switch (strength) {
+      case 'strong': return 'text-green-700 bg-green-100';
+      case 'moderate': return 'text-yellow-700 bg-yellow-100';
+      case 'weak': return 'text-orange-700 bg-orange-100';
+      case 'unsupported': return 'text-red-700 bg-red-100';
+      default: return 'text-gray-700 bg-gray-100';
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
       {/* Backdrop */}
@@ -38,11 +63,11 @@ export function ToulminModal({
 
       {/* Modal */}
       <div className="relative min-h-screen flex items-center justify-center p-4">
-        <div className="relative bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="relative bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
           {/* Header */}
           <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
             <h2 className="text-xl font-semibold text-gray-900">
-              Claim Analysis
+              Claim Evaluation
             </h2>
             <button
               onClick={onClose}
@@ -54,160 +79,80 @@ export function ToulminModal({
 
           {/* Content */}
           <div className="p-6 space-y-6">
-            {/* Claim */}
+            {/* Claim Display */}
             <div>
-              <label className="text-sm font-medium text-gray-500 mb-2 block">
-                Claim ({claim.type})
+              <label className="text-sm font-medium text-gray-700 mb-2 block">
+                Your Claim
               </label>
               <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <p className="text-base text-gray-900 italic">"{claim.text}"</p>
+                <p className="text-base text-gray-900">{claim.text}</p>
               </div>
+              <p className="text-xs text-gray-500 mt-1">Type: {claim.type}</p>
             </div>
 
-            {/* Overall Assessment */}
+            {/* Overall Strength Assessment */}
             {evaluation && (
-              <div className="grid grid-cols-2 gap-4">
-                <div className="p-4 bg-gray-50 rounded-lg">
-                  <div className="text-sm font-medium text-gray-500 mb-1">
-                    Strength
-                  </div>
-                  <div className="text-2xl font-bold capitalize">
+              <div className="border border-gray-200 rounded-lg p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-semibold text-gray-900">Evidence Strength</h3>
+                  <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStrengthColor(evaluation.strength)}`}>
                     {evaluation.strength}
+                  </span>
+                </div>
+                
+                {/* Score bar */}
+                <div className="mb-2">
+                  <div className="flex justify-between text-xs text-gray-600 mb-1">
+                    <span>Score</span>
+                    <span>{evaluation.overallScore}/100</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div 
+                      className={`h-2 rounded-full transition-all ${
+                        evaluation.overallScore >= 70 ? 'bg-green-500' :
+                        evaluation.overallScore >= 40 ? 'bg-yellow-500' :
+                        'bg-red-500'
+                      }`}
+                      style={{ width: `${evaluation.overallScore}%` }}
+                    />
                   </div>
                 </div>
-                <div className="p-4 bg-gray-50 rounded-lg">
-                  <div className="text-sm font-medium text-gray-500 mb-1">
-                    Overall Score
-                  </div>
-                  <div className="text-2xl font-bold">
-                    {evaluation.overallScore}/100
-                  </div>
-                </div>
-              </div>
-            )}
 
-            {/* Toulmin Framework */}
-            {evaluation && (
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-gray-900">
-                  Toulmin Framework Analysis
-                </h3>
-
-                {/* Grounds (Evidence) */}
-                <div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <CheckCircle className="w-5 h-5 text-blue-600" />
-                    <h4 className="font-medium text-gray-900">
-                      Grounds (Evidence)
-                    </h4>
-                  </div>
-                  {evaluation.grounds && evaluation.grounds.length > 0 ? (
-                    <div className="space-y-2">
-                      {evaluation.grounds.map((ground: any, idx: number) => (
-                        <div
-                          key={idx}
-                          className="p-3 bg-green-50 border border-green-200 rounded-lg"
-                        >
-                          <p className="text-sm text-gray-700">{ground.content}</p>
-                          <div className="flex gap-3 mt-2 text-xs text-gray-500">
-                            <span>Relevance: {Math.round(ground.relevanceScore * 100)}%</span>
-                            <span>Strength: {Math.round(ground.strengthScore * 100)}%</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-red-600 italic">
-                      No evidence found in notebook
-                    </p>
-                  )}
-                </div>
-
-                {/* Warrant */}
-                {evaluation.warrant && (
-                  <div>
-                    <div className="flex items-center gap-2 mb-2">
-                      <Lightbulb className="w-5 h-5 text-orange-600" />
-                      <h4 className="font-medium text-gray-900">
-                        Warrant (Logical Link)
-                      </h4>
-                    </div>
-                    <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg">
-                      <p className="text-sm text-gray-700">
-                        {evaluation.warrant.statement}
-                      </p>
-                      <div className="flex gap-3 mt-2 text-xs text-gray-500">
-                        <span className="capitalize">Type: {evaluation.warrant.type}</span>
-                        <span>Confidence: {Math.round(evaluation.warrant.confidence * 100)}%</span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Qualifier */}
-                {evaluation.qualifier && (
-                  <div>
-                    <div className="flex items-center gap-2 mb-2">
-                      <h4 className="font-medium text-gray-900">Qualifier</h4>
-                    </div>
-                    <div className="p-3 bg-purple-50 border border-purple-200 rounded-lg text-sm">
-                      {evaluation.qualifier.detected?.length > 0 && (
-                        <div className="mb-2">
-                          <span className="font-medium">Detected: </span>
-                          {evaluation.qualifier.detected.join(', ')}
-                        </div>
-                      )}
-                      {evaluation.qualifier.missing?.length > 0 && (
-                        <div>
-                          <span className="font-medium text-red-600">Missing: </span>
-                          {evaluation.qualifier.missing.join(', ')}
-                        </div>
-                      )}
-                    </div>
+                {/* Evidence count */}
+                {evaluation.grounds && evaluation.grounds.length > 0 && (
+                  <div className="flex items-center gap-2 text-sm text-gray-600 mt-3">
+                    <CheckCircle className="w-4 h-4 text-green-600" />
+                    <span>{evaluation.grounds.length} piece{evaluation.grounds.length !== 1 ? 's' : ''} of supporting evidence found</span>
                   </div>
                 )}
               </div>
             )}
 
-            {/* Issues */}
-            {claimSuggestions.length > 0 && (
+            {/* Issues/Suggestions */}
+            {evaluation && evaluation.issues && evaluation.issues.length > 0 && (
               <div>
-                <div className="flex items-center gap-2 mb-3">
-                  <AlertCircle className="w-5 h-5 text-red-600" />
-                  <h3 className="text-lg font-semibold text-gray-900">
-                    Issues Found ({claimSuggestions.length})
-                  </h3>
-                </div>
+                <h3 className="text-sm font-semibold text-gray-900 mb-3">Issues & Suggestions</h3>
                 <div className="space-y-3">
-                  {claimSuggestions.map((suggestion) => {
-                    const severityColor = 
-                      suggestion.severity === 'critical' ? 'red' :
-                      suggestion.severity === 'warning' ? 'orange' : 'blue';
-
+                  {evaluation.issues.map((issue: any, index: number) => {
+                    const display = getSeverityDisplay(issue.severity);
+                    const Icon = display.icon;
+                    
                     return (
-                      <div
-                        key={suggestion.id}
-                        className={`p-4 bg-${severityColor}-50 border border-${severityColor}-200 rounded-lg`}
+                      <div 
+                        key={index} 
+                        className={`p-4 rounded-lg border ${display.borderColor} ${display.bgColor}`}
                       >
-                        <div className="flex items-start justify-between mb-2">
-                          <div>
-                            <span className={`text-xs px-2 py-1 rounded bg-${severityColor}-100 text-${severityColor}-800 font-medium`}>
-                              {suggestion.severity}
-                            </span>
-                            <h4 className="font-medium text-gray-900 mt-2">
-                              {suggestion.message}
-                            </h4>
+                        <div className="flex items-start gap-3">
+                          <Icon className={`w-5 h-5 ${display.color} flex-shrink-0 mt-0.5`} />
+                          <div className="flex-1">
+                            <p className={`font-medium ${display.color} mb-1`}>
+                              {issue.message}
+                            </p>
+                            <p className="text-sm text-gray-700">
+                              {issue.explanation}
+                            </p>
                           </div>
                         </div>
-                        <p className="text-sm text-gray-600 mb-3">
-                          {suggestion.explanation}
-                        </p>
-                        <button
-                          onClick={() => onAcceptSuggestion(suggestion.id)}
-                          className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded transition-colors"
-                        >
-                          Fix This Issue
-                        </button>
                       </div>
                     );
                   })}
@@ -216,37 +161,96 @@ export function ToulminModal({
             )}
 
             {/* Evidence Gaps */}
-            {evaluation?.gaps && evaluation.gaps.length > 0 && (
+            {evaluation && evaluation.gaps && evaluation.gaps.length > 0 && (
               <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-3">
-                  Evidence Gaps
+                <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                  <TrendingUp className="w-4 h-4" />
+                  Suggested Additional Analysis
                 </h3>
-                <div className="space-y-2">
-                  {evaluation.gaps.map((gap: any, idx: number) => (
-                    <div
-                      key={idx}
-                      className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg"
+                <div className="space-y-3">
+                  {evaluation.gaps.map((gap: any, index: number) => (
+                    <div 
+                      key={index}
+                      className="p-4 bg-purple-50 border border-purple-200 rounded-lg"
                     >
-                      <p className="text-sm font-medium text-gray-900">
+                      <p className="text-sm font-medium text-purple-900 mb-1">
                         {gap.description}
                       </p>
                       {gap.missingConcepts && gap.missingConcepts.length > 0 && (
-                        <p className="text-xs text-gray-600 mt-1">
-                          Missing: {gap.missingConcepts.join(', ')}
-                        </p>
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          {gap.missingConcepts.map((concept: string, i: number) => (
+                            <span 
+                              key={i}
+                              className="px-2 py-1 bg-purple-100 text-purple-700 text-xs rounded-full"
+                            >
+                              {concept}
+                            </span>
+                          ))}
+                        </div>
                       )}
                     </div>
                   ))}
                 </div>
               </div>
             )}
+
+            {/* Action Suggestions from SuggestionPanel */}
+            {claimSuggestions.length > 0 && (
+              <div>
+                <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                  <Lightbulb className="w-4 h-4" />
+                  Recommended Actions
+                </h3>
+                <div className="space-y-2">
+                  {claimSuggestions.map((suggestion) => (
+                    <div 
+                      key={suggestion.id}
+                      className="p-4 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors"
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-gray-900 mb-1">
+                            {suggestion.message}
+                          </p>
+                          {suggestion.explanation && (
+                            <p className="text-sm text-gray-600">
+                              {suggestion.explanation}
+                            </p>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => onAcceptSuggestion(suggestion.id)}
+                          className="ml-4 px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition-colors flex-shrink-0"
+                        >
+                          Apply
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* No issues - positive feedback */}
+            {evaluation && 
+             (!evaluation.issues || evaluation.issues.length === 0) && 
+             (!claimSuggestions || claimSuggestions.length === 0) && (
+              <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                <div className="flex items-center gap-3">
+                  <CheckCircle className="w-5 h-5 text-green-600" />
+                  <p className="text-sm text-green-800">
+                    This claim looks well-supported! No issues detected.
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Footer */}
-          <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 px-6 py-4">
+          <div className="border-t border-gray-200 px-6 py-4 bg-gray-50">
             <button
               onClick={onClose}
-              className="w-full px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 transition-colors"
+              className="w-full px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors"
             >
               Close
             </button>

@@ -84,6 +84,42 @@ const handleContentChange = (newContent: string, newPos?: number) => {
     const suggestion = suggestions.find(s => s.id === suggestionId);
     if (!suggestion) return;
   
+    // Handle REMOVE CLAIM
+    if (suggestion.type === 'remove-claim') {
+      const claim = claims.find(c => c.id === suggestion.claimId);
+      if (!claim) return;
+  
+      // Confirm with user before removing
+      const confirmed = window.confirm(
+        `Are you sure you want to remove this claim?\n\n"${claim.text}"\n\nThis action cannot be undone.`
+      );
+  
+      if (confirmed) {
+        // Remove the claim text from content
+        const newText = 
+          content.substring(0, claim.position.from) +
+          content.substring(claim.position.to);
+  
+        // Mark this position as fixed
+        setFixedPositions(prev => [...prev, {
+          from: claim.position.from,
+          to: claim.position.from,
+          fixedAt: new Date()
+        }]);
+  
+        // Update content
+        setContent(newText);
+        if (onContentChange) {
+          onContentChange(newText);
+        }
+  
+        // Dismiss the suggestion
+        setDismissedSuggestions(prev => new Set([...prev, suggestionId]));
+      }
+      return;
+    }
+  
+    // Handle ADD ANALYSIS
     if (suggestion.type === 'add-analysis') {
       // If already expanded, collapse it
       if (expandedSuggestionId === suggestionId) {
@@ -94,82 +130,103 @@ const handleContentChange = (newContent: string, newPos?: number) => {
       // Expand and fetch analysis suggestions
       setExpandedSuggestionId(suggestionId);
       
-      // Suggest analyses for missing evidence
       const claim = claims.find(c => c.id === suggestion.claimId);
       if (claim) {
         try {
-          const result = await suggestAnalyses(claim.text, []);
-          console.log('Analysis suggestions:', result.suggestions);
-          
-          // Store the analysis suggestions for this suggestion ID
-          setAnalysisSuggestions(prev => ({
-            ...prev,
-            [suggestionId]: result.suggestions || []
-          }));
+          // If we already have a suggested query in metadata, use it
+          if (suggestion.metadata?.suggestedQuery) {
+            // Create a single analysis suggestion from the metadata
+            const analysisSuggestion = {
+              title: `Analyze: ${suggestion.metadata.missingConcepts?.join(', ') || 'Evidence'}`,
+              naturalLanguageQuery: suggestion.metadata.suggestedQuery,
+              explanation: suggestion.explanation || 'Run this analysis to support your claim',
+              expectedOutput: 'Data visualization and statistical results',
+              priority: 'high' as const,
+              estimatedComplexity: 'simple' as const,
+              fillsGaps: [suggestion.metadata.gapType || 'missing-evidence'],
+            };
+  
+            setAnalysisSuggestions(prev => ({
+              ...prev,
+              [suggestionId]: [analysisSuggestion]
+            }));
+          } else {
+            // Fallback: Use the suggestAnalyses API
+            const result = await suggestAnalyses(claim.text, []);
+            console.log('Analysis suggestions:', result.suggestions);
+            
+            setAnalysisSuggestions(prev => ({
+              ...prev,
+              [suggestionId]: result.suggestions || []
+            }));
+          }
         } catch (err) {
           console.error('Failed to suggest analyses:', err);
+          alert('Failed to generate analysis suggestions. Please try again.');
         }
       }
-    } else {
-        // If already expanded with modifications, collapse it
-        if (expandedSuggestionId === suggestionId && modificationOptions[suggestionId]) {
-          setExpandedSuggestionId(null);
-          return;
-        }
-      
-        // Expand and fetch modification suggestions
-        setExpandedSuggestionId(suggestionId);
-      
-        // Generate claim modifications
-        const claim = claims.find(c => c.id === suggestion.claimId);
-        if (!claim) return;
-      
-        try {
-          const modificationType = 
-            suggestion.type === 'weaken-claim' ? 'weaken' :
-            suggestion.type === 'add-caveat' ? 'caveat' :
-            suggestion.type === 'add-qualifier' ? 'weaken' :
-            'weaken';
-      
-          // Get the full evaluation for this claim
-          const evalResponse = await fetch('/api/claims/evaluate', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              claim,
-              notebookContext,
-            }),
-          });
-      
-          if (!evalResponse.ok) {
-            throw new Error('Failed to evaluate claim');
-          }
-      
-          const evalData = await evalResponse.json();
-      
-          // Generate modifications
-          const result = await generateModifications(
-            claim.text,
-            evalData.toulminDiagram,
-            modificationType as any
-          );
-      
-          console.log('Modification suggestions:', result.suggestions);
-      
-          // Store the modification options for this suggestion ID
-          setModificationOptions(prev => ({
-            ...prev,
-            [suggestionId]: {
-              suggestions: result.suggestions || [],
-              explanations: result.explanations || [],
-              claim: claim
-            }
-          }));
-        } catch (err) {
-          console.error('Failed to generate modifications:', err);
-          alert('Failed to generate suggestions. Please try again.');
-        }
+      return;
+    }
+  
+    // Handle MODIFICATION SUGGESTIONS (weaken, caveat, etc.)
+    // If already expanded with modifications, collapse it
+    if (expandedSuggestionId === suggestionId && modificationOptions[suggestionId]) {
+      setExpandedSuggestionId(null);
+      return;
+    }
+  
+    // Expand and fetch modification suggestions
+    setExpandedSuggestionId(suggestionId);
+  
+    // Generate claim modifications
+    const claim = claims.find(c => c.id === suggestion.claimId);
+    if (!claim) return;
+  
+    try {
+      const modificationType = 
+        suggestion.type === 'weaken-claim' ? 'weaken' :
+        suggestion.type === 'add-caveat' ? 'caveat' :
+        suggestion.type === 'add-qualifier' ? 'weaken' :
+        'weaken';
+  
+      // Get the full evaluation for this claim
+      const evalResponse = await fetch('/api/claims/evaluate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          claim,
+          notebookContext,
+        }),
+      });
+  
+      if (!evalResponse.ok) {
+        throw new Error('Failed to evaluate claim');
       }
+  
+      const evalData = await evalResponse.json();
+  
+      // Generate modifications
+      const result = await generateModifications(
+        claim.text,
+        evalData.toulminDiagram,
+        modificationType as any
+      );
+  
+      console.log('Modification suggestions:', result.suggestions);
+  
+      // Store the modification options for this suggestion ID
+      setModificationOptions(prev => ({
+        ...prev,
+        [suggestionId]: {
+          suggestions: result.suggestions || [],
+          explanations: result.explanations || [],
+          claim: claim
+        }
+      }));
+    } catch (err) {
+      console.error('Failed to generate modifications:', err);
+      alert('Failed to generate suggestions. Please try again.');
+    }
   };
 
   const handleDismissSuggestion = (suggestionId: string) => {

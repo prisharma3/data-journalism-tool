@@ -107,92 +107,123 @@ private parseGeminiJSON(response: string): any {
    */
   private buildEvaluationPrompt(claim: ClaimStructure, notebookContext: any): string {
     return `You are an expert research analyst evaluating substantive claims using the Toulmin argumentation framework.
-  
-  **CLAIM TO EVALUATE:**
-  "${claim.text}"
-  
-  **CLAIM TYPE:** ${claim.type}
-  
-  **NOTEBOOK CONTEXT:**
-  
-  Hypotheses:
-  ${notebookContext.hypotheses?.map((h: any) => `- ${h.content}`).join('\n') || 'None'}
-  
-  Analyses:
-  ${notebookContext.cells?.map((c: any) => `
-  Analysis: ${c.query}
-  Output: ${c.output?.text || 'No output'}
-  `).join('\n') || 'None'}
-  
-  Insights:
-  ${notebookContext.insights?.map((i: any) => `- ${i.content}`).join('\n') || 'None'}
-  
-  **EVALUATION GUIDELINES:**
-  
-  CRITICAL - DO NOT EVALUATE:
-  - Structural text: headings, section titles, "Introduction", "Conclusion", "Methods", "Results", etc.
-  - Transitional phrases: "In this section...", "As we will see...", "This paper argues..."
-  - Meta-commentary about the writing itself
-  
-  ONLY EVALUATE: Substantive research claims that make assertions about data, relationships, or findings.
-  
-  STRATEGIC ISSUE DETECTION:
-  - Return MAXIMUM 1-3 issues per claim - only the most critical problems
-  - Critical severity: ONLY for claims with zero supporting evidence or fundamental logical flaws
-  - Warning severity: For claims with weak/incomplete evidence or missing qualifiers
-  - Info severity: For minor improvements or style suggestions
-  - If the claim is reasonably well-supported, return ZERO issues
-  
-  **YOUR TASK:**
-  Evaluate this claim ONLY if it's a substantive research claim. Return JSON with this EXACT structure:
-  
-  {
-    "grounds": [
-      {
-        "content": "specific evidence text from notebook",
-        "sourceType": "insight" or "cell_output",
-        "relevanceScore": 0.0-1.0,
-        "strengthScore": 0.0-1.0
-      }
-    ],
-    "warrant": {
-      "statement": "one sentence explaining logical link between evidence and claim",
-      "type": "causal" or "statistical" or "comparative" or "logical",
-      "confidence": 0.0-1.0,
-      "acceptanceLevel": "widely-accepted" or "domain-specific" or "controversial"
-    },
-    "overallScore": 0-100,
-    "strength": "strong" or "moderate" or "weak" or "unsupported",
-    "issues": [
-      {
-        "type": "no-evidence" or "weak-evidence" or "overclaim" or "missing-qualifier" or "causation-correlation",
-        "severity": "critical" or "warning" or "info",
-        "message": "short description",
-        "explanation": "detailed explanation"
-      }
-    ],
-    "gaps": [
-      {
-        "type": "missing-variable" or "missing-relationship",
-        "description": "what analysis is missing",
-        "missingConcepts": ["concept1", "concept2"],
-        "importance": "critical" or "important" or "optional"
-      }
-    ],
-    "qualifier": {
-      "detected": ["existing qualifier words"],
-      "missing": ["suggested qualifiers like 'some', 'many', 'likely'"],
-      "appropriatenessScore": 0.0-1.0
+
+**CLAIM TO EVALUATE:**
+"${claim.text}"
+
+**CLAIM TYPE:** ${claim.type}
+
+**CRITICAL - FIRST CHECK IF THIS IS EVEN A CLAIM:**
+
+DO NOT EVALUATE if the text is:
+- Headings or section titles: "Introduction", "Methods", "Results", "Conclusion", "Discussion", "Background"
+- Transitional phrases: "In this section", "As we will see", "Next, we examine", "This paper"
+- Meta-commentary: "We will show", "This analysis demonstrates", "Our approach"
+- Questions or hypotheses: "Does X cause Y?", "We hypothesize that"
+- Methodological descriptions: "We used", "The data was collected"
+
+IF THE TEXT ABOVE IS ANY OF THESE, return this EXACT JSON:
+{
+  "recommendedAction": "claim-is-fine",
+  "actionReasoning": "Not a substantive claim",
+  "grounds": [],
+  "warrant": {"statement": "", "type": "logical", "confidence": 0, "acceptanceLevel": "widely-accepted"},
+  "overallScore": 0,
+  "strength": "unsupported",
+  "issues": [],
+  "gaps": [],
+  "qualifier": {"detected": [], "missing": [], "appropriatenessScore": 0},
+  "modificationPaths": {"weaken": "", "caveat": "", "reverse": ""}
+}
+
+**ONLY IF THIS IS A SUBSTANTIVE RESEARCH CLAIM, CONTINUE BELOW:**
+
+**DECISION TREE - YOU MUST CLASSIFY THIS CLAIM INTO ONE OF THREE CATEGORIES:**
+
+1. **"claim-is-fine"**: Claim is well-supported by existing evidence, no changes needed
+   - Use when: Strong grounds + strong warrant + evidence exists in notebook
+   
+2. **"claim-needs-change"**: Claim must be modified (evidence exists but claim is too strong/weak)
+   - Use when: Evidence exists BUT claim language doesn't match evidence strength
+   - Offer: weaken, caveat, or remove options
+   
+3. **"claim-might-need-change"**: Not enough evidence to evaluate properly
+   - Use when: Missing evidence OR insufficient analysis in notebook
+   - Must suggest: what specific analysis would help evaluate this claim
+
+**NOTEBOOK CONTEXT:**
+
+Hypotheses:
+${notebookContext.hypotheses?.map((h: any) => `- ${h.content}`).join('\n') || 'None'}
+
+Analyses:
+${notebookContext.cells?.map((c: any) => `
+Analysis: ${c.query}
+Output: ${c.output?.text || 'No output'}
+`).join('\n') || 'None'}
+
+Insights:
+${notebookContext.insights?.map((i: any) => `- ${i.content}`).join('\n') || 'None'}
+
+**EVALUATION GUIDELINES:**
+
+STRATEGIC ISSUE DETECTION:
+- Return MAXIMUM 1-3 issues per claim - only the most critical problems
+- Critical severity: ONLY for claims with zero supporting evidence or fundamental logical flaws
+- Warning severity: For claims with weak/incomplete evidence or missing qualifiers
+- Info severity: For minor improvements or style suggestions
+- If the claim is reasonably well-supported, return ZERO issues
+
+**YOUR TASK:**
+Evaluate this claim and return JSON with this EXACT structure:
+
+{
+  "recommendedAction": "claim-is-fine" OR "claim-needs-change" OR "claim-might-need-change",
+  "actionReasoning": "one sentence explaining why you chose this action",
+  "grounds": [
+    {
+      "content": "specific evidence text from notebook",
+      "sourceType": "insight" or "cell_output",
+      "relevanceScore": 0.0-1.0,
+      "strengthScore": 0.0-1.0
     }
+  ],
+  "warrant": {
+    "statement": "one sentence explaining logical link between evidence and claim",
+    "type": "causal" or "statistical" or "comparative" or "logical",
+    "confidence": 0.0-1.0,
+    "acceptanceLevel": "widely-accepted" or "domain-specific" or "controversial"
+  },
+  "overallScore": 0-100,
+  "strength": "strong" or "moderate" or "weak" or "unsupported",
+  "issues": [
+    {
+      "type": "no-evidence" or "weak-evidence" or "overclaim" or "missing-qualifier" or "causation-correlation",
+      "severity": "critical" or "warning" or "info",
+      "message": "short description (max 10 words)",
+      "explanation": "detailed explanation (2-3 sentences)"
+    }
+  ],
+  "gaps": [
+    {
+      "type": "missing-variable" or "missing-relationship" or "fundamentally-unsupportable",
+      "description": "what analysis is missing OR why claim cannot be supported",
+      "missingConcepts": ["concept1"],
+      "importance": "critical" or "important" or "optional",
+      "suggestedQuery": "SPECIFIC natural language query OR null if claim is fundamentally unsupportable"
+    }
+  ],
+  "qualifier": {
+    "detected": ["existing qualifier words"],
+    "missing": ["if needed, suggest qualifiers like 'some', 'many', 'likely'"],
+    "appropriatenessScore": 0.0-1.0
+  },
+  "modificationPaths": {
+    "weaken": "if choosing to weaken, what qualifier words to add",
+    "caveat": "if choosing to caveat, what limitation to acknowledge",
+    "reverse": "if choosing to remove/reverse, why evidence is insufficient"
   }
-  
-  **IMPORTANT:**
-  - If this is structural/transitional text, return empty grounds[] and issues[]
-  - Be thorough but SELECTIVE in finding evidence
-  - Return MAXIMUM 1-3 issues - prioritize ruthlessly
-  - Score strength honestly based on evidence quality
-  - Return ONLY valid JSON, no other text`;
-  }
+}
   
   /**
    * Generate claim modifications using Gemini
