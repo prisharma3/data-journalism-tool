@@ -144,43 +144,46 @@ export default function TabbedWorkspace({ projectId }: TabbedWorkspaceProps) {
         ref={containerRef}
         className="flex-1 flex overflow-hidden"
       >
-        {activeTab === 'notebook' ? (
-          <div className="flex-1 flex animate-fadeIn">
-            {/* Minimap - Resizable */}
-            <div 
-              className="bg-gray-50 border-r border-gray-200 flex-shrink-0"
-              style={{ width: `${minimapWidth}px` }}
-            >
-              <Minimap 
-                projectId={projectId}
-                sections={minimapSections}
-              />
-            </div>
+{/* Notebook Tab Content - Show/Hide based on activeTab */}
+<div 
+          className={`flex-1 flex ${activeTab === 'notebook' ? 'animate-fadeIn' : 'hidden'}`}
+        >
+          {/* Minimap - Resizable */}
+          <div 
+            className="bg-gray-50 border-r border-gray-200 flex-shrink-0"
+            style={{ width: `${minimapWidth}px` }}
+          >
+            <Minimap 
+              projectId={projectId}
+              sections={minimapSections}
+            />
+          </div>
 
-            {/* Resize Handle */}
-            <div
-              className="w-1 bg-gray-200 hover:bg-blue-500 cursor-col-resize flex-shrink-0 transition-colors relative group"
-              onMouseDown={() => setIsDragging(true)}
-            >
-              <div className="absolute inset-0 flex items-center justify-center">
-                <GripVertical className="w-3 h-3 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
-              </div>
-            </div>
-
-            {/* Notebook - Takes remaining space (handles its own internal layout) */}
-            <div className="flex-1 min-w-0">
-              <NotebookCanvas 
-                projectId={projectId}
-                onSectionsChange={setMinimapSections}
-              />
+          {/* Resize Handle */}
+          <div
+            className="w-1 bg-gray-200 hover:bg-blue-500 cursor-col-resize flex-shrink-0 transition-colors relative group"
+            onMouseDown={() => setIsDragging(true)}
+          >
+            <div className="absolute inset-0 flex items-center justify-center">
+              <GripVertical className="w-3 h-3 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
             </div>
           </div>
-        ) : (
-          /* Writing Content - Full Width */
-          <div className="flex-1 bg-white overflow-y-auto animate-fadeIn">
-            <WritingContainer projectId={projectId} />
+
+          {/* Notebook - Takes remaining space (handles its own internal layout) */}
+          <div className="flex-1 min-w-0">
+            <NotebookCanvas 
+              projectId={projectId}
+              onSectionsChange={setMinimapSections}
+            />
           </div>
-        )}
+        </div>
+
+        {/* Writing Tab Content - Show/Hide based on activeTab */}
+        <div 
+          className={`flex-1 bg-white overflow-y-auto ${activeTab === 'writing' ? 'animate-fadeIn' : 'hidden'}`}
+        >
+          <WritingContainer projectId={projectId} />
+        </div>
       </div>
     </div>
   );

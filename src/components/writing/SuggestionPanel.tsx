@@ -9,20 +9,22 @@ import { WritingSuggestion, RelevantAnalysis } from '@/types/writing';
 import { AlertCircle, AlertTriangle, Info, Lightbulb, ExternalLink, X } from 'lucide-react';
 
 interface SuggestionPanelProps {
-  suggestions: WritingSuggestion[];
-  relevantAnalyses: RelevantAnalysis[];
-  isLoadingSuggestions: boolean;
-  isLoadingAnalyses: boolean;
-  onAcceptSuggestion: (suggestionId: string) => void;
-  onDismissSuggestion: (suggestionId: string) => void;
-  onViewEvidence: (cellId: string) => void;
-  expandedSuggestionId: string | null;
-  analysisSuggestions: {[key: string]: any};
-  modificationOptions: {[key: string]: any};
-  onCloseExpanded: () => void;
-  onSelectModification: (suggestionId: string, modificationIndex: number) => void;
-  projectId?: string; // Add projectId for scoped localStorage
-}
+    suggestions: WritingSuggestion[];
+    relevantAnalyses: RelevantAnalysis[];
+    isLoadingSuggestions: boolean;
+    isLoadingAnalyses: boolean;
+    onAcceptSuggestion: (suggestionId: string) => void;
+    onDismissSuggestion: (suggestionId: string) => void;
+    onViewEvidence: (cellId: string) => void;
+    onSuggestionClick?: (claimId: string) => void; 
+    highlightedClaimId?: string | null; 
+    expandedSuggestionId: string | null;
+    analysisSuggestions: {[key: string]: any};
+    modificationOptions: {[key: string]: any};
+    onCloseExpanded: () => void;
+    onSelectModification: (suggestionId: string, modificationIndex: number) => void;
+    projectId?: string;
+  }
 
 // Storage key for tab state
 const getStorageKey = (projectId?: string) => {
@@ -32,20 +34,22 @@ const getStorageKey = (projectId?: string) => {
 };
 
 export function SuggestionPanel({
-  suggestions,
-  relevantAnalyses,
-  isLoadingSuggestions,
-  isLoadingAnalyses,
-  onAcceptSuggestion,
-  onDismissSuggestion,
-  onViewEvidence,
-  expandedSuggestionId,
-  analysisSuggestions,
-  modificationOptions,
-  onCloseExpanded,
-  onSelectModification,
-  projectId,
-}: SuggestionPanelProps) {
+    suggestions,
+    relevantAnalyses,
+    isLoadingSuggestions,
+    isLoadingAnalyses,
+    onAcceptSuggestion,
+    onDismissSuggestion,
+    onViewEvidence,
+    onSuggestionClick, 
+    highlightedClaimId,  
+    expandedSuggestionId,
+    analysisSuggestions,
+    modificationOptions,
+    onCloseExpanded,
+    onSelectModification,
+    projectId,
+  }: SuggestionPanelProps) {
   // FIXED: Load initial state from localStorage to persist across navigation
   const [activeTab, setActiveTab] = useState<'suggestions' | 'relevant'>(() => {
     if (typeof window !== 'undefined') {
@@ -138,15 +142,24 @@ export function SuggestionPanel({
                 .filter(s => s.status === 'active')
                 .sort((a, b) => b.priority - a.priority)
                 .map((suggestion) => (
-<div key={suggestion.id}>
+<div key={suggestion.id} id={`suggestion-${suggestion.id}`}>
   <div 
-    className={`rounded-lg p-4 transition-all ${
-      suggestion.type === 'remove-claim' 
-        ? 'bg-red-50 border-2 border-red-300 hover:shadow-lg' 
-        : suggestion.type === 'add-analysis'
-        ? 'bg-blue-50 border-2 border-blue-300 hover:shadow-lg'
-        : 'border border-gray-200 hover:shadow-md'
-    }`}
+onClick={() => {
+    if (onSuggestionClick) {
+      onSuggestionClick(suggestion.claimId);
+    }
+  }}
+    className={`rounded-lg p-4 transition-all cursor-pointer ${
+        highlightedClaimId === suggestion.claimId
+          ? 'ring-2 ring-yellow-400 shadow-lg'
+          : ''
+      } ${
+        suggestion.type === 'remove-claim' 
+          ? 'bg-red-50 border-2 border-red-300 hover:shadow-lg' 
+          : suggestion.type === 'add-analysis'
+          ? 'bg-blue-50 border-2 border-blue-300 hover:shadow-lg'
+          : 'border border-gray-200 hover:shadow-md'
+      }`}
   >
     {/* Header */}
     <div className="flex items-start gap-3 mb-3">
@@ -270,7 +283,11 @@ export function SuggestionPanel({
       )}
     </div>
   </button>
+
 ))}
+</div>
+</div>
+)}
 
   {/* Expanded Modification Options Section */}
   {expandedSuggestionId === suggestion.id && modificationOptions[suggestion.id] && (
@@ -320,18 +337,15 @@ export function SuggestionPanel({
                 <p className="text-xs mt-1">Start writing to get suggestions</p>
               </div>
             ) : (
-              relevantAnalyses.map((analysis) => (
-                <div
-                  key={analysis.cellId}
-                  className="border border-gray-200 rounded-lg p-3 hover:shadow-md transition-shadow cursor-pointer"
-                  onClick={() => onViewEvidence(analysis.cellId)}
-                >
+                relevantAnalyses.map((analysis, index) => (
+                    <div
+                      key={`${analysis.cellId}-${index}`}
+                      className="border border-gray-200 rounded-lg p-3 hover:shadow-md transition-shadow cursor-pointer"
+                      onClick={() => onViewEvidence(analysis.cellId)}
+                    >
                   <div className="flex items-start gap-2 mb-2">
                     <Lightbulb className="w-4 h-4 text-blue-500 flex-shrink-0 mt-0.5" />
                     <div className="flex-1">
-                      <span className="text-xs px-2 py-0.5 rounded bg-blue-100 text-blue-800">
-                        {Math.round(analysis.overallScore * 100)}% relevant
-                      </span>
                     </div>
                     <ExternalLink className="w-4 h-4 text-gray-400" />
                   </div>

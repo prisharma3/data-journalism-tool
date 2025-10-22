@@ -12,6 +12,7 @@ interface TextWithClaimsProps {
   claims: ClaimStructure[];
   suggestions: WritingSuggestion[];
   onClaimClick: (claimId: string) => void;
+  highlightedClaimId?: string | null; 
   onContentChange?: (newText: string, cursorPosition: number) => void;
   isEditable?: boolean;
 }
@@ -21,6 +22,7 @@ export function TextWithClaims({
   claims,
   suggestions,
   onClaimClick,
+  highlightedClaimId,
   onContentChange,
   isEditable = false,
 }: TextWithClaimsProps) {
@@ -63,19 +65,34 @@ export function TextWithClaims({
     const claimSuggestions = suggestions.filter(s => s.claimId === claim.id);
     
     if (claimSuggestions.length === 0) {
-      return 'decoration-green-500 decoration-dotted'; // No issues
+      return 'decoration-green-500 decoration-2'; // No issues - solid green
     }
-
-    const hasCritical = claimSuggestions.some(s => s.severity === 'critical');
-    const hasWarning = claimSuggestions.some(s => s.severity === 'warning');
-
-    if (hasCritical) {
-      return 'decoration-red-500 decoration-wavy'; // Critical
+  
+    // Get highest priority suggestion
+    const topSuggestion = claimSuggestions.sort((a, b) => b.priority - a.priority)[0];
+  
+    // Match colors to suggestion types (same as badge colors in SuggestionPanel)
+    if (topSuggestion.type === 'remove-claim') {
+      return 'decoration-red-500 decoration-wavy decoration-2'; // Red wavy for remove
     }
-    if (hasWarning) {
-      return 'decoration-orange-500 decoration-dashed'; // Warning
+    if (topSuggestion.type === 'add-analysis') {
+      return 'decoration-blue-500 decoration-2'; // Blue solid for add-analysis
     }
-    return 'decoration-blue-500 decoration-dotted'; // Info
+    if (topSuggestion.type === 'weaken-claim' || topSuggestion.type === 'add-qualifier') {
+      return 'decoration-yellow-500 decoration-2'; // Yellow for weaken
+    }
+    if (topSuggestion.type === 'add-caveat') {
+      return 'decoration-orange-500 decoration-2'; // Orange for caveat
+    }
+    
+    // Fallback to severity
+    if (topSuggestion.severity === 'critical') {
+      return 'decoration-red-500 decoration-wavy decoration-2';
+    }
+    if (topSuggestion.severity === 'warning') {
+      return 'decoration-orange-500 decoration-2';
+    }
+    return 'decoration-blue-500 decoration-2';
   };
 
   const getTooltip = (claim: ClaimStructure) => {
@@ -148,24 +165,30 @@ export function TextWithClaims({
         }}
         suppressContentEditableWarning
       >
-        {segments.map((segment, index) => {
-          if (segment.claim) {
-            return (
-              <span
-                key={index}
-                className={`underline underline-offset-4 cursor-pointer hover:bg-gray-100 transition-colors ${getUnderlineClass(segment.claim)}`}
-                onClick={(e) => {
-                  e.preventDefault();
-                  onClaimClick(segment.claim!.id);
-                }}
-                title={getTooltip(segment.claim)}
-              >
-                {segment.text}
-              </span>
-            );
-          }
-          return <React.Fragment key={index}>{segment.text}</React.Fragment>;
-        })}
+{segments.map((segment, index) => {
+  if (segment.claim) {
+    const isHighlighted = highlightedClaimId === segment.claim.id;
+    return (
+<span
+  key={index}
+  data-claim-id={segment.claim.id}
+  className={`underline underline-offset-4 cursor-pointer transition-all ${
+    isHighlighted 
+      ? 'bg-yellow-200 ring-2 ring-yellow-400' 
+      : 'hover:bg-gray-100'
+  } ${getUnderlineClass(segment.claim)}`}
+  onClick={(e) => {
+    e.preventDefault();
+    onClaimClick(segment.claim!.id);
+  }}
+  title={getTooltip(segment.claim)}
+>
+        {segment.text}
+      </span>
+    );
+  }
+  return <React.Fragment key={index}>{segment.text}</React.Fragment>;
+})}
       </div>
     );
   }
@@ -173,21 +196,26 @@ export function TextWithClaims({
   // Read-only mode
   return (
     <div className="whitespace-pre-wrap leading-relaxed font-serif">
-      {segments.map((segment, index) => {
-        if (segment.claim) {
-          return (
-            <span
-              key={index}
-              className={`underline underline-offset-4 cursor-pointer hover:bg-gray-100 transition-colors ${getUnderlineClass(segment.claim)}`}
-              onClick={() => onClaimClick(segment.claim!.id)}
-              title={getTooltip(segment.claim)}
-            >
-              {segment.text}
-            </span>
-          );
-        }
-        return <span key={index}>{segment.text}</span>;
-      })}
+{segments.map((segment, index) => {
+  if (segment.claim) {
+    const isHighlighted = highlightedClaimId === segment.claim.id;
+    return (
+      <span
+        key={index}
+        className={`underline underline-offset-4 cursor-pointer transition-all ${
+          isHighlighted 
+            ? 'bg-yellow-200 ring-2 ring-yellow-400' 
+            : 'hover:bg-gray-100'
+        } ${getUnderlineClass(segment.claim)}`}
+        onClick={() => onClaimClick(segment.claim!.id)}
+        title={getTooltip(segment.claim)}
+      >
+        {segment.text}
+      </span>
+    );
+  }
+  return <span key={index}>{segment.text}</span>;
+})}
     </div>
   );
 }

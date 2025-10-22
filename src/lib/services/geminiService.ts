@@ -225,6 +225,28 @@ Evaluate this claim and return JSON with this EXACT structure:
   }
 }
   
+**CRITICAL DECISION RULES:**
+- If overallScore >= 70 AND strength = "strong" → "claim-is-fine"
+- If overallScore 40-69 AND evidence exists → "claim-needs-change"
+- If overallScore < 40 OR gaps.importance = "critical" → "claim-might-need-change"
+
+**FOR "claim-might-need-change" - DETERMINE IF FUNDAMENTALLY UNSUPPORTABLE:**
+- If the claim requires data/variables that don't exist in the dataset → type: "fundamentally-unsupportable", suggestedQuery: null
+- If the claim contradicts known facts/methodology → type: "fundamentally-unsupportable", suggestedQuery: null
+- If analysis COULD help → provide specific suggestedQuery
+
+**Examples:**
+- Claim: "Higher altitude causes lower obesity rates" in a dataset with no altitude data → fundamentally-unsupportable
+- Claim: "X causes Y" but study is correlational not experimental → fundamentally-unsupportable (methodology)
+- Claim: "Income affects health" but no health variables exist → fundamentally-unsupportable
+- Claim: "X correlates with Y" but no analysis done yet → SUPPORTABLE, suggest "calculate correlation between X and Y"
+
+**IMPORTANT:**
+- Return ONLY valid JSON, no other text
+- Be decisive - pick ONE recommendedAction
+- If structural text, return empty arrays and "claim-is-fine"`;
+  }
+  
   /**
    * Generate claim modifications using Gemini
    */
@@ -246,7 +268,7 @@ Evaluate this claim and return JSON with this EXACT structure:
     evaluation: any,
     modificationType: string
   ): string {
-    return `You are an expert editor helping improve academic claims.
+    return `You are an expert editor helping improve academic claims
 
 **ORIGINAL CLAIM:**
 "${claimText}"

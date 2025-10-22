@@ -7,7 +7,6 @@ import React, { useState, useEffect} from 'react';
 import { useClaimEvaluation } from '@/hooks/useClaimEvaluation';
 import { SuggestionPanel } from './SuggestionPanel';
 import { TextWithClaims } from './TextWithClaims';
-import { ToulminModal } from './ToulminModal';
 
 interface EnhancedWritingEditorProps {
   projectId: string;
@@ -27,10 +26,9 @@ export function EnhancedWritingEditor({
     const [content, setContent] = useState(initialContent);
     const [cursorPosition, setCursorPosition] = useState(0);
     const [enabled, setEnabled] = useState(true);
-    const [selectedClaimId, setSelectedClaimId] = useState<string | null>(null);
-    const [selectedEvaluation, setSelectedEvaluation] = useState<any | null>(null);
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [dismissedSuggestions, setDismissedSuggestions] = useState<Set<string>>(new Set());
+
+    const [highlightedClaimId, setHighlightedClaimId] = useState<string | null>(null);
+const [dismissedSuggestions, setDismissedSuggestions] = useState<Set<string>>(new Set());
 
     const [expandedSuggestionId, setExpandedSuggestionId] = useState<string | null>(null);
 const [analysisSuggestions, setAnalysisSuggestions] = useState<{[key: string]: any}>({});
@@ -233,37 +231,19 @@ const handleContentChange = (newContent: string, newPos?: number) => {
     setDismissedSuggestions(prev => new Set([...prev, suggestionId]));
   };
 
-  const handleClaimClick = async (claimId: string) => {
-    const claim = claims.find(c => c.id === claimId);
-    if (!claim) return;
-  
-    setSelectedClaimId(claimId);
-    setIsModalOpen(true);
-  
-    // Fetch evaluation for this claim
-    try {
-      const response = await fetch('/api/claims/evaluate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          claim,
-          notebookContext,
-        }),
-      });
-  
-      if (response.ok) {
-        const data = await response.json();
-        setSelectedEvaluation(data.toulminDiagram);
+  const handleClaimClick = (claimId: string) => {
+    // Toggle highlight
+    setHighlightedClaimId(prev => prev === claimId ? null : claimId);
+    
+    // Find and scroll to the suggestion for this claim
+    const suggestionForClaim = suggestions.find(s => s.claimId === claimId);
+    if (suggestionForClaim) {
+      // Scroll suggestion into view
+      const suggestionElement = document.getElementById(`suggestion-${suggestionForClaim.id}`);
+      if (suggestionElement) {
+        suggestionElement.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       }
-    } catch (err) {
-      console.error('Failed to load evaluation:', err);
     }
-  };
-  
-  const handleCloseModal = () => {
-    setIsModalOpen(false);
-    setSelectedClaimId(null);
-    setSelectedEvaluation(null);
   };
 
   const handleViewEvidence = (cellId: string) => {
@@ -327,6 +307,7 @@ const handleContentChange = (newContent: string, newPos?: number) => {
   claims={claims}
   suggestions={suggestions}
   onClaimClick={handleClaimClick}
+  highlightedClaimId={highlightedClaimId}
   onContentChange={(newText, newCursor) => {
     handleContentChange(newText, newCursor);
   }}
@@ -353,6 +334,8 @@ const handleContentChange = (newContent: string, newPos?: number) => {
 {/* Suggestion Panel */}
 <SuggestionPanel
 projectId={projectId}
+onSuggestionClick={handleClaimClick}  
+highlightedClaimId={highlightedClaimId} 
   suggestions={suggestions.filter(s => {
     // Filter out dismissed suggestions
     if (dismissedSuggestions.has(s.id)) return false;
@@ -411,16 +394,6 @@ projectId={projectId}
     // The contentEditable div will update automatically
   }}
 />
-
-      {/* Toulmin Modal */}
-      <ToulminModal
-        isOpen={isModalOpen}
-        onClose={handleCloseModal}
-        claim={claims.find(c => c.id === selectedClaimId) || null}
-        evaluation={selectedEvaluation}
-        suggestions={suggestions.filter(s => !dismissedSuggestions.has(s.id))}
-        onAcceptSuggestion={handleAcceptSuggestion}
-      />
     </div>
   );
 }
