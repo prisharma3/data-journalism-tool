@@ -8,6 +8,7 @@ import { generateId } from '@/lib/utils/text';
 
 export class SemanticIndexer {
   private index: SearchIndexEntry[] = [];
+  private lastIndexTime: Date | null = null;
   
   /**
    * Index all notebook content
@@ -69,6 +70,9 @@ export class SemanticIndexer {
         });
       }
     }
+    
+    // Update last index time
+    this.lastIndexTime = new Date();
   }
   
   /**
@@ -162,9 +166,26 @@ export class SemanticIndexer {
   }
   
   /**
+   * Get index size
+   * ADDED: This method was missing
+   */
+  getIndexSize(): number {
+    return this.index.length;
+  }
+  
+  /**
+   * Get last index time
+   * ADDED: This method was missing
+   */
+  getLastIndexTime(): Date | null {
+    return this.lastIndexTime;
+  }
+  
+  /**
    * Clear index
    */
   clear(): void {
     this.index = [];
+    this.lastIndexTime = null;
   }
 }

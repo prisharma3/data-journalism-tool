@@ -134,27 +134,35 @@ export class RemembranceAgent {
   }
   
   /**
-   * Get current context
+   * Get current writing context
+   * ADDED: This method was missing and causing API errors
    */
   getCurrentContext(): WritingContext | null {
     return this.contextMonitor.getCurrentContext();
   }
   
   /**
-   * Get indexer status
+   * Get index status
+   * ADDED: This method was missing and causing API errors
    */
   getIndexStatus() {
-    return this.indexer.getStatus();
+    return {
+      isIndexed: this.isIndexed,
+      totalItems: this.indexer.getIndexSize(),
+      lastIndexed: this.indexer.getLastIndexTime()
+    };
   }
   
   /**
-   * Clear and reindex
+   * Force reindex of notebook content
+   * ADDED: This method was missing and causing API errors
    */
   async reindex(
     notebookContent: any,
     generateEmbedding: (text: string) => Promise<number[]>
   ): Promise<void> {
     this.indexer.clear();
+    this.isIndexed = false;
     await this.indexNotebook(notebookContent, generateEmbedding);
   }
 }

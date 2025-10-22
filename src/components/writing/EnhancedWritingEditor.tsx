@@ -265,47 +265,16 @@ const handleContentChange = (newContent: string, newPos?: number) => {
 {/* Editor - Single editable view with inline claim highlights */}
 <div className="flex-1 overflow-y-auto bg-white">
           <div className="max-w-4xl mx-auto p-8">
-            <div className="relative">
-              <textarea
-                value={content}
-                onChange={(e) => {
-                  const newPos = e.target.selectionStart;
-                  handleContentChange(e.target.value, newPos);
-                }}
-                onSelect={(e) => {
-                  const target = e.target as HTMLTextAreaElement;
-                  setCursorPosition(target.selectionStart);
-                }}
-                placeholder="Start writing your article... Claims will be automatically detected and evaluated."
-                className="w-full min-h-[calc(100vh-200px)] p-6 text-base leading-relaxed resize-none focus:outline-none font-serif border-0 bg-transparent"
-                style={{
-                  lineHeight: '1.8',
-                  fontSize: '16px',
-                  overflow: 'hidden',
-                }}
-              />
-              
-              {/* Overlay with claim underlines */}
-              {claims.length > 0 && (
-                <div 
-                  className="absolute top-0 left-0 right-0 pointer-events-none p-6 text-base leading-relaxed font-serif"
-                  style={{
-                    lineHeight: '1.8',
-                    fontSize: '16px',
-                    color: 'transparent',
-                    whiteSpace: 'pre-wrap',
-                    wordBreak: 'break-word',
-                  }}
-                >
-                  <TextWithClaims
-                    text={content}
-                    claims={claims}
-                    suggestions={suggestions}
-                    onClaimClick={handleClaimClick}
-                  />
-                </div>
-              )}
-            </div>
+          <TextWithClaims
+  text={content}
+  claims={claims}
+  suggestions={suggestions}
+  onClaimClick={handleClaimClick}
+  onContentChange={(newText, newCursor) => {
+    handleContentChange(newText, newCursor);
+  }}
+  isEditable={true}
+/>
             
             {/* Claim count indicator */}
             {claims.length > 0 && (
@@ -326,6 +295,7 @@ const handleContentChange = (newContent: string, newPos?: number) => {
 
 {/* Suggestion Panel */}
 <SuggestionPanel
+projectId={projectId}
   suggestions={suggestions.filter(s => {
     // Filter out dismissed suggestions
     if (dismissedSuggestions.has(s.id)) return false;
@@ -357,20 +327,31 @@ const handleContentChange = (newContent: string, newPos?: number) => {
     if (!options) return;
     
     const claim = options.claim;
+    const replacement = options.suggestions[modificationIndex];
+    
+    // Create new text with replacement
     const newText = 
       content.substring(0, claim.position.from) +
-      options.suggestions[modificationIndex] +
+      replacement +
       content.substring(claim.position.to);
     
     // Mark this position as fixed
     setFixedPositions(prev => [...prev, {
       from: claim.position.from,
-      to: claim.position.from + options.suggestions[modificationIndex].length,
+      to: claim.position.from + replacement.length,
       fixedAt: new Date()
     }]);
     
-    handleContentChange(newText, claim.position.from);
+    // Update content
+    setContent(newText);
+    if (onContentChange) {
+      onContentChange(newText);
+    }
+    
     setExpandedSuggestionId(null);
+    
+    // Let TextWithClaims re-render with new content
+    // The contentEditable div will update automatically
   }}
 />
 

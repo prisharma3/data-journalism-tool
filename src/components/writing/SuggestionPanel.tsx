@@ -1,9 +1,10 @@
 /**
  * SUGGESTION PANEL COMPONENT
  * Right sidebar showing suggestions and relevant analyses
+ * FIXED: Tab state now persists when switching between main interface tabs
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { WritingSuggestion, RelevantAnalysis } from '@/types/writing';
 import { AlertCircle, AlertTriangle, Info, Lightbulb, ExternalLink, X } from 'lucide-react';
 
@@ -20,7 +21,15 @@ interface SuggestionPanelProps {
   modificationOptions: {[key: string]: any};
   onCloseExpanded: () => void;
   onSelectModification: (suggestionId: string, modificationIndex: number) => void;
+  projectId?: string; // Add projectId for scoped localStorage
 }
+
+// Storage key for tab state
+const getStorageKey = (projectId?: string) => {
+  return projectId 
+    ? `suggestionPanel_activeTab_${projectId}`
+    : 'suggestionPanel_activeTab_global';
+};
 
 export function SuggestionPanel({
   suggestions,
@@ -35,8 +44,23 @@ export function SuggestionPanel({
   modificationOptions,
   onCloseExpanded,
   onSelectModification,
+  projectId,
 }: SuggestionPanelProps) {
-  const [activeTab, setActiveTab] = useState<'suggestions' | 'relevant'>('suggestions');
+  // FIXED: Load initial state from localStorage to persist across navigation
+  const [activeTab, setActiveTab] = useState<'suggestions' | 'relevant'>(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem(getStorageKey(projectId));
+      return (stored as 'suggestions' | 'relevant') || 'suggestions';
+    }
+    return 'suggestions';
+  });
+
+  // FIXED: Save tab state to localStorage whenever it changes
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(getStorageKey(projectId), activeTab);
+    }
+  }, [activeTab, projectId]);
 
   const getSeverityIcon = (severity: string) => {
     switch (severity) {
@@ -62,12 +86,12 @@ export function SuggestionPanel({
   };
 
   return (
-<div className="w-80 border-l border-gray-200 bg-white flex flex-col" style={{ height: '100%' }}>
+    <div className="w-80 border-l border-gray-200 bg-white flex flex-col" style={{ height: '100%' }}>
       {/* Header with tabs */}
       <div className="border-b border-gray-200">
         <div className="flex">
           <button
-            className={`flex-1 px-4 py-3 text-sm font-medium ${
+            className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
               activeTab === 'suggestions'
                 ? 'text-blue-600 border-b-2 border-blue-600'
                 : 'text-gray-600 hover:text-gray-900'
@@ -77,7 +101,7 @@ export function SuggestionPanel({
             Issues ({suggestions.length})
           </button>
           <button
-            className={`flex-1 px-4 py-3 text-sm font-medium ${
+            className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
               activeTab === 'relevant'
                 ? 'text-blue-600 border-b-2 border-blue-600'
                 : 'text-gray-600 hover:text-gray-900'
@@ -90,7 +114,6 @@ export function SuggestionPanel({
       </div>
 
       {/* Content */}
-      {/* <div className="flex-1 overflow-y-auto"> */}
       <div className="flex-1 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 150px)' }}>
         {activeTab === 'suggestions' ? (
           <div className="p-4 space-y-4">
@@ -117,9 +140,9 @@ export function SuggestionPanel({
                         {getSeverityIcon(suggestion.severity)}
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-1">
-                          <span className={`text-xs px-2 py-1 rounded ${getTypeLabel(suggestion.type).color}`}>
-  {getTypeLabel(suggestion.type).text}
-</span>
+                            <span className={`text-xs px-2 py-1 rounded ${getTypeLabel(suggestion.type).color}`}>
+                              {getTypeLabel(suggestion.type).text}
+                            </span>
                           </div>
                           <h4 className="text-sm font-semibold text-gray-900">
                             {suggestion.message}
@@ -172,18 +195,9 @@ export function SuggestionPanel({
                         </div>
                         <div className="space-y-2 max-h-60 overflow-y-auto">
                           {analysisSuggestions[suggestion.id].map((analysis: any, idx: number) => (
-                            <div
-                              key={analysis.id || idx}
-                              className="p-3 bg-white rounded border border-gray-200 text-sm"
-                            >
-                              <p className="text-gray-800 font-medium mb-2">{analysis.title}</p>
-                              <p className="text-gray-600 text-xs mb-2">{analysis.explanation}</p>
-                              {analysis.naturalLanguageQuery && (
-                                <div className="mt-2 p-2 bg-gray-50 rounded text-xs">
-                                  <span className="font-medium text-gray-700">Query: </span>
-                                  <span className="text-gray-600">{analysis.naturalLanguageQuery}</span>
-                                </div>
-                              )}
+                            <div key={idx} className="p-3 bg-white rounded border border-gray-200">
+                              <p className="text-sm font-medium text-gray-900 mb-1">{analysis.query}</p>
+                              <p className="text-xs text-gray-600">{analysis.explanation}</p>
                             </div>
                           ))}
                         </div>
@@ -194,7 +208,7 @@ export function SuggestionPanel({
                     {expandedSuggestionId === suggestion.id && modificationOptions[suggestion.id] && (
                       <div className="mt-2 border border-green-200 rounded-lg bg-green-50 p-4">
                         <div className="flex items-center justify-between mb-3">
-                          <h5 className="text-sm font-semibold text-gray-900">Choose a Replacement</h5>
+                          <h5 className="text-sm font-semibold text-gray-900">Fix Options</h5>
                           <button
                             onClick={onCloseExpanded}
                             className="text-gray-400 hover:text-gray-600 transition-colors"
@@ -234,30 +248,26 @@ export function SuggestionPanel({
             ) : relevantAnalyses.length === 0 ? (
               <div className="text-center py-8 text-gray-500">
                 <Lightbulb className="w-12 h-12 mx-auto mb-2 text-gray-400" />
-                <p className="text-sm">No relevant analyses found</p>
-                <p className="text-xs mt-1">Keep analyzing in the notebook!</p>
+                <p className="text-sm">No relevant analyses</p>
+                <p className="text-xs mt-1">Start writing to get suggestions</p>
               </div>
             ) : (
               relevantAnalyses.map((analysis) => (
                 <div
                   key={analysis.cellId}
-                  className="border border-gray-200 rounded-lg p-3 hover:shadow-md transition-shadow"
+                  className="border border-gray-200 rounded-lg p-3 hover:shadow-md transition-shadow cursor-pointer"
+                  onClick={() => onViewEvidence(analysis.cellId)}
                 >
                   <div className="flex items-start gap-2 mb-2">
-                    <ExternalLink className="w-4 h-4 text-blue-500 mt-0.5" />
+                    <Lightbulb className="w-4 h-4 text-blue-500 flex-shrink-0 mt-0.5" />
                     <div className="flex-1">
-                      <p className="text-sm text-gray-900 mb-1">{analysis.snippet}</p>
-                      <div className="flex items-center gap-2 text-xs text-gray-500">
-                        <span>Relevance: {Math.round(analysis.relevanceScore * 100)}%</span>
-                      </div>
+                      <span className="text-xs px-2 py-0.5 rounded bg-blue-100 text-blue-800">
+                        {Math.round(analysis.overallScore * 100)}% relevant
+                      </span>
                     </div>
+                    <ExternalLink className="w-4 h-4 text-gray-400" />
                   </div>
-                  <button
-                    onClick={() => onViewEvidence(analysis.cellId)}
-                    className="text-xs text-blue-600 hover:text-blue-700 font-medium"
-                  >
-                    View in Notebook →
-                  </button>
+                  <p className="text-sm text-gray-700 line-clamp-3">{analysis.snippet}</p>
                 </div>
               ))
             )}
