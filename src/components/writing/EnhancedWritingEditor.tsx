@@ -275,12 +275,19 @@ if (suggestion.type === 'add-analysis') {
         <div className="border-b border-gray-200 bg-white px-4 py-2 flex items-center gap-4">
           <div className="flex items-center gap-2">
             <label className="flex items-center gap-2 text-sm text-gray-700">
-              <input
-                type="checkbox"
-                checked={enabled}
-                onChange={(e) => setEnabled(e.target.checked)}
-                className="rounded"
-              />
+            <input
+  type="checkbox"
+  checked={enabled}
+  onChange={(e) => {
+    const newEnabled = e.target.checked;
+    setEnabled(newEnabled);
+    
+    // If re-enabling, don't trigger full re-detection
+    // The useClaimEvaluation hook will handle it
+    console.log('Evaluation', newEnabled ? 'enabled' : 'disabled');
+  }}
+  className="rounded"
+/>
               Enable claim evaluation
             </label>
           </div>
@@ -333,13 +340,6 @@ if (suggestion.type === 'add-analysis') {
                 {claims.length} claim{claims.length !== 1 ? 's' : ''} detected • Click underlined text for details
               </div>
             )}
-
-            {/* Claim count indicator */}
-{claims.length > 0 && (
-  <div className="mt-4 text-sm text-gray-500 text-center">
-    {claims.length} claim{claims.length !== 1 ? 's' : ''} detected • Click underlined text for details
-  </div>
-)}
 
 {/* Underline legend */}
 {claims.length > 0 && (
