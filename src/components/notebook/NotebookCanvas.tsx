@@ -8,6 +8,7 @@ import DatasetSection from './DatasetSection';
 import HypothesisSection from './HypothesisSection';
 import InsightCard from './InsightCard';
 import { useRef } from 'react';
+import { Insight as GlobalInsight, Hypothesis as GlobalHypothesis, Tag as GlobalTag } from '@/types';
 
 interface NotebookCanvasProps {
     projectId: string;
@@ -39,7 +40,7 @@ interface NotebookState {
         columnTypes: Record<string, string>;
       };
     } | null;
-    hypotheses: Hypothesis[];
+    hypotheses: GlobalHypothesis[];
   }
 
 
@@ -61,26 +62,14 @@ interface NotebookState {
     hypothesisTags?: string[];
   }
 
-interface Hypothesis {
-    id: string;
-    content: string;
-    createdAt: Date;
-  }
+// Use global Hypothesis type
 
-  interface Tag {
-    id: string;
-    name: string;
-    color: string;
-  }
+// Use global Tag type
   
-  interface Insight {
-    id: string;
-    cellId: string; // Which code cell this insight is attached to
-    content: string;
-    tagId: string;
-    hypothesisTags?: string[]; // Array of hypothesis IDs
-    plotThumbnail?: string;
-    createdAt: Date;
+  interface LocalInsight extends GlobalInsight {
+    cellId?: string; // Which code cell this insight is attached to (local use)
+    hypothesisTags?: string[]; // Array of hypothesis IDs (local use)
+    plotThumbnail?: string; // Local use
   }
 
   interface NotebookState {
@@ -99,9 +88,9 @@ interface Hypothesis {
         columnTypes: Record<string, string>;
       };
     } | null;
-    hypotheses: Hypothesis[];
-    insights: Insight[];
-    tags: Tag[];
+    hypotheses: GlobalHypothesis[];
+    insights: LocalInsight[];
+    tags: GlobalTag[];
   }
 
   export default function NotebookCanvas({ projectId, onSectionsChange }: NotebookCanvasProps) {
@@ -140,13 +129,13 @@ const {
 useEffect(() => {
   if (tags.length === 0) {
     setTags([
-      { id: 'tag-1', name: 'For Review', color: '#9C27B0', createdAt: new Date(), updatedAt: new Date() },
-      { id: 'tag-2', name: 'Explanation', color: '#4CAF50', createdAt: new Date(), updatedAt: new Date() },
-      { id: 'tag-3', name: 'For Teacher', color: '#F44336', createdAt: new Date(), updatedAt: new Date() },
-      { id: 'tag-4', name: 'Key Finding', color: '#2196F3', createdAt: new Date(), updatedAt: new Date() },
+      { id: 'tag-1', projectId, name: 'For Review', color: '#9C27B0', createdAt: new Date().toISOString() },
+      { id: 'tag-2', projectId, name: 'Explanation', color: '#4CAF50', createdAt: new Date().toISOString() },
+      { id: 'tag-3', projectId, name: 'For Teacher', color: '#F44336', createdAt: new Date().toISOString() },
+      { id: 'tag-4', projectId, name: 'Key Finding', color: '#2196F3', createdAt: new Date().toISOString() },
     ]);
   }
-}, [tags.length, setTags]);
+}, [tags.length, setTags, projectId]);
 
       const [insightModal, setInsightModal] = useState<{
         isOpen: boolean;
@@ -189,7 +178,7 @@ const filteredCells = useMemo(() => {
   }
   
   return cells.filter(cell => 
-    cell.hypothesisTags?.some(tag => notebookHypothesisFilter.includes(tag))
+    cell.hypothesisTags?.some((tag: string) => notebookHypothesisFilter.includes(tag))
   );
 }, [cells, notebookHypothesisFilter]);
 
@@ -214,7 +203,7 @@ const [insightFilters, setInsightFilters] = useState<{
     // Filter by hypotheses
     if (insightFilters.hypotheses.length > 0) {
       filtered = filtered.filter(insight => 
-        insight.hypothesisTags?.some(tag => insightFilters.hypotheses.includes(tag))
+        (insight as LocalInsight).hypothesisTags?.some(tag => insightFilters.hypotheses.includes(tag))
       );
     }
     
@@ -301,7 +290,7 @@ const handleInsightClick = useCallback((insightId: string, cellId: string) => {
       });
       currentPosition += baseHeight;
   
-      const cellInsights = insights.filter(i => i.cellId === cell.id);
+      const cellInsights = insights.filter(i => (i as LocalInsight).cellId === cell.id);
       cellInsights.forEach(insight => {
         const tag = tags.find(t => t.id === insight.tagId);
         sections.push({
@@ -565,7 +554,7 @@ const executeCell = useCallback(async (cellId: string) => {
     setSelectedCell(cellId);
     
     // Find insights for this cell and scroll to them
-    const cellInsights = insights.filter(i => i.cellId === cellId);
+    const cellInsights = insights.filter(i => (i as LocalInsight).cellId === cellId);
     if (cellInsights.length > 0 && insightsScrollRef.current) {
       const firstInsight = cellInsights[0];
       const insightElement = insightRefs.current.get(firstInsight.id);
@@ -609,7 +598,7 @@ const handleDatasetRemove = useCallback(async () => {
 }, [dataset, setDataset]);
 
   // Handle hypotheses change
-  const handleHypothesesChange = useCallback((newHypotheses: Hypothesis[]) => {
+  const handleHypothesesChange = useCallback((newHypotheses: GlobalHypothesis[]) => {
     setHypotheses(newHypotheses);
   }, [setHypotheses]);
 
@@ -660,17 +649,21 @@ const handleGenerateCode = useCallback(async (cellId: string, query: string) => 
 
 // Handle adding insight
 const handleAddInsight = useCallback((cellId: string, content: string, tagId: string, hypothesisTags?: string[]) => {
-  const newInsight: Insight = {
+  const newInsight: LocalInsight = {
     id: `insight-${Date.now()}`,
-    cellId,
-    content,
+    projectId,
+    analysisOutputId: '', // Will be set when linked to analysis output
     tagId,
+    content,
+    position: insights.length,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    cellId,
     hypothesisTags: hypothesisTags || [],
-    createdAt: new Date(),
   };
 
   addInsightToStore(newInsight);
-}, [addInsightToStore]);
+}, [addInsightToStore, projectId, insights.length]);
 
 
   // Handle deleting insight
@@ -680,41 +673,52 @@ const handleAddInsight = useCallback((cellId: string, content: string, tagId: st
   
 // Handle updating insight
 const handleUpdateInsight = useCallback((insightId: string, content: string, tagId: string, hypothesisTags?: string[]) => {
-  updateInsightInStore(insightId, { content, tagId, hypothesisTags: hypothesisTags || [] });
+  updateInsightInStore(insightId, { 
+    content, 
+    tagId, 
+    updatedAt: new Date().toISOString(),
+    // Store hypothesisTags in a local property since it's not part of the global type
+    ...(hypothesisTags && { hypothesisTags: hypothesisTags })
+  });
 }, [updateInsightInStore]);
   
   // Handle adding new tag
   const handleAddTag = useCallback((name: string, color: string) => {
-    const newTag: Tag = {
+    const newTag: GlobalTag = {
       id: `tag-${Date.now()}`,
+      projectId,
       name,
       color,
+      createdAt: new Date().toISOString(),
     };
   
     addTagToStore(newTag);
   
     return newTag.id;
-  }, [addTagToStore]);
+  }, [addTagToStore, projectId]);
 
 // Handle opening insight - create blank insight in edit mode in panel
 const handleOpenInsightModal = useCallback((cellId: string) => {
-  // Find the cell to get its plot output
   const cell = cells.find(c => c.id === cellId);
   const plotThumbnail = cell?.output?.plot || undefined;
 
-  const newInsight: Insight = {
+  const newInsight: LocalInsight = {
     id: `insight-${Date.now()}`,
-    cellId,
-    content: '',
+    projectId,
+    analysisOutputId: '', // Will be set when linked to analysis output
     tagId: '', // Empty tagId means it's in "new/edit" mode
+    content: '',
+    position: insights.length,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    cellId,
     hypothesisTags: [],
     plotThumbnail,
-    createdAt: new Date(),
   };
   
-  // Add at the beginning
-  setInsights([newInsight, ...insights]);
-}, [cells, insights, setInsights]);
+  // Use the store action instead
+  addInsightToStore(newInsight);
+}, [cells, addInsightToStore, projectId, insights.length]);
   
   // Handle closing insight modal
   const handleCloseInsightModal = useCallback(() => {
@@ -727,20 +731,24 @@ const handleSaveInsight = useCallback((content: string, tagId: string, hypothesi
     const cell = cells.find(c => c.id === insightModal.cellId);
     const plotThumbnail = cell?.output?.plot || undefined;
     
-    const newInsight: Insight = {
+    const newInsight: LocalInsight = {
       id: `insight-${Date.now()}`,
-      cellId: insightModal.cellId,
-      content,
+      projectId,
+      analysisOutputId: '', // Will be set when linked to analysis output
       tagId,
+      content,
+      position: insights.length,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      cellId: insightModal.cellId,
       hypothesisTags,
       plotThumbnail,
-      createdAt: new Date(),
     };
   
     addInsightToStore(newInsight);
     handleCloseInsightModal();
   }
-}, [insightModal.cellId, cells, addInsightToStore, handleCloseInsightModal]);
+}, [insightModal.cellId, cells, addInsightToStore, handleCloseInsightModal, projectId, insights.length]);
 
   // Listen for minimap section clicks
   useEffect(() => {
@@ -1186,7 +1194,7 @@ const handleSaveInsight = useCallback((content: string, tagId: string, hypothesi
             onUpdate={handleUpdateInsight}
             onDelete={handleDeleteInsight}
             onAddTag={handleAddTag}
-            onClick={() => handleInsightClick(insight.id, insight.cellId)}
+            onClick={() => handleInsightClick(insight.id, (insight as LocalInsight).cellId || '')}
             isHighlighted={highlightedInsightId === insight.id}
             allTags={tags}
             hypotheses={hypotheses}

@@ -10,23 +10,6 @@ interface WritingContainerProps {
   projectId: string;
 }
 
-// export default function WritingContainer({ projectId }: WritingContainerProps) {
-//   const { token } = useAuthStore();
-//   const {
-//     cells,
-//     dataset,
-//     hypotheses,
-//     insights,
-//     activeHypothesisId,
-//   } = useProjectStore();
-
-// //   const [articleContent, setArticleContent] = useState<string>('');
-// const { articleContent: storedContent, setArticleContent: setStoredContent } = useProjectStore();
-// const [articleContent, setArticleContent] = useState<string>(storedContent || '');
-//   const [isLoading, setIsLoading] = useState(true);
-//   const [error, setError] = useState<string | null>(null);
-//   const [wordCount, setWordCount] = useState(0);
-
 export default function WritingContainer({ projectId }: WritingContainerProps) {
     const { token } = useAuthStore();
     const {
@@ -39,21 +22,19 @@ export default function WritingContainer({ projectId }: WritingContainerProps) {
       setArticleContent: setStoredContent,  // Get action from store
     } = useProjectStore();
   
-    const [articleContent, setArticleContent] = useState<string>(storedContent || '');
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [wordCount, setWordCount] = useState(0);
-  
-    // Sync local state with store on mount
-    useEffect(() => {
-      if (storedContent) {
-        setArticleContent(storedContent);
-      }
-    }, []); // Only on mount
 
-  // Load article content on mount
-  useEffect(() => {
+// Load article content on mount - only if store is empty
+useEffect(() => {
     const loadArticle = async () => {
+      // Skip loading if we already have content in the store
+      if (storedContent) {
+        setIsLoading(false);
+        return;
+      }
+  
       try {
         setIsLoading(true);
         const response = await fetch(`/api/projects/${projectId}/article`, {
@@ -61,13 +42,13 @@ export default function WritingContainer({ projectId }: WritingContainerProps) {
             'Authorization': `Bearer ${token}`,
           },
         });
-
+  
         if (!response.ok) {
           throw new Error('Failed to load article');
         }
-
+  
         const data = await response.json();
-        setArticleContent(data.article.content || '');
+        setStoredContent(data.article.content || '');
         setWordCount(data.article.word_count || 0);
       } catch (err: any) {
         console.error('Error loading article:', err);
@@ -76,11 +57,11 @@ export default function WritingContainer({ projectId }: WritingContainerProps) {
         setIsLoading(false);
       }
     };
-
+  
     if (projectId && token) {
       loadArticle();
     }
-  }, [projectId, token]);
+  }, [projectId, token, setStoredContent, storedContent]);
 
   // Auto-save article content
   const saveArticle = async (content: string, wordCount: number) => {
@@ -110,11 +91,10 @@ export default function WritingContainer({ projectId }: WritingContainerProps) {
   };
 
   // Use auto-save hook
-  useAutoSave(articleContent, saveArticle, 3000); // Save every 3 seconds
+  useAutoSave(storedContent, saveArticle, 3000); // Save every 3 seconds
 
 // Handle content change from editor
 const handleContentChange = (newContent: string) => {
-    setArticleContent(newContent);
     setStoredContent(newContent); // Save to store immediately
     
     // Calculate word count (simple approach)
@@ -201,13 +181,13 @@ const handleContentChange = (newContent: string) => {
 
       {/* Editor */}
       <div className="flex-1 overflow-hidden">
-        <EnhancedWritingEditor
-          projectId={projectId}
-          notebookContext={notebookContext}
-          activeHypothesis={activeHypothesisId || undefined}
-          initialContent={articleContent}
-          onContentChange={handleContentChange}
-        />
+      <EnhancedWritingEditor
+  projectId={projectId}
+  notebookContext={notebookContext}
+  activeHypothesis={activeHypothesisId || undefined}
+  initialContent={storedContent}
+  onContentChange={handleContentChange}
+/>
       </div>
     </div>
   );

@@ -79,7 +79,7 @@ export function useClaimEvaluation({
       
       // Auto-evaluate claims
       if (data.claims.length > 0) {
-        console.log('Starting evaluation...'); 
+        console.log('Starting evaluation...');
       } else {
         setSuggestions([]);
       }
@@ -89,7 +89,7 @@ export function useClaimEvaluation({
     } finally {
       setIsDetecting(false);
     }
-  }, [text, projectId, cursorPosition, notebookContext, enabled]);
+}, [text, projectId, cursorPosition, notebookContext, enabled]);
 
   /**
    * Evaluate detected claims
@@ -264,6 +264,14 @@ export function useClaimEvaluation({
       debouncedRelevant.cancel();
     };
   }, [debouncedDetect, debouncedRelevant]);
+
+  // Auto-evaluate claims when they are detected
+useEffect(() => {
+    if (claims.length > 0 && enabled) {
+      console.log('🔬 Auto-evaluating', claims.length, 'claims');
+      evaluateClaims(claims);
+    }
+  }, [claims, enabled, evaluateClaims]);
 
   return {
     // State

@@ -4,11 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Plus, Trash2, Save, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
-interface Hypothesis {
-  id: string;
-  content: string;
-  createdAt: Date;
-}
+import { Hypothesis } from '@/types';
 
 interface HypothesisSectionProps {
   hypotheses: Hypothesis[];
@@ -52,8 +48,11 @@ export default function HypothesisSection({
   const addHypothesis = () => {
     const newHypothesis: Hypothesis = {
       id: `hypothesis-${Date.now()}`,
+      projectId: '', // Will be set by the parent component
       content: '',
-      createdAt: new Date(),
+      position: hypotheses.length,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     };
 
     const updated = [...hypotheses, newHypothesis];

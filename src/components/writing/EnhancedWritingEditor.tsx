@@ -32,12 +32,12 @@ export function EnhancedWritingEditor({
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [dismissedSuggestions, setDismissedSuggestions] = useState<Set<string>>(new Set());
     
-    // Only update content if initialContent changes AND local content is empty
-    useEffect(() => {
-      if (initialContent && !content) {
-        setContent(initialContent);
-      }
-    }, [initialContent]); // Remove 'content' from dependencies
+// Sync with initialContent whenever it changes (from store)
+useEffect(() => {
+    if (initialContent !== undefined) {
+      setContent(initialContent);
+    }
+  }, [initialContent]);
 
   // Use claim evaluation hook
   const {
@@ -61,13 +61,16 @@ export function EnhancedWritingEditor({
   });
 
 // Handle content change from editor
-const handleContentChange = (newContent: string) => {
-    setArticleContent(newContent);
-    setStoredContent(newContent); // Save to store immediately
-    
-    // Calculate word count (simple approach)
-    const words = newContent.trim().split(/\s+/).filter(word => word.length > 0);
-    setWordCount(words.length);
+// Handle content change from editor
+const handleContentChange = (newContent: string, newPos?: number) => {
+    setContent(newContent);
+    if (newPos !== undefined) {
+      setCursorPosition(newPos);
+    }
+    // Call parent's onChange if provided
+    if (onContentChange) {
+      onContentChange(newContent);
+    }
   };
 
   const handleAcceptSuggestion = async (suggestionId: string) => {

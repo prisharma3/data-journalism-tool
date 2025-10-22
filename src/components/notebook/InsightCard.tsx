@@ -14,12 +14,12 @@ interface Tag {
 interface InsightCardProps {
   insight: {
     id: string;
-    cellId: string;
+    cellId?: string;
     content: string;
     tagId: string;
     hypothesisTags?: string[];
     plotThumbnail?: string;
-    createdAt: Date;
+    createdAt: string;
   };
   tag?: Tag;
   onUpdate: (insightId: string, content: string, tagId: string, hypothesisTags?: string[]) => void;
@@ -28,7 +28,7 @@ interface InsightCardProps {
   onClick?: () => void; // ADD THIS LINE
   isHighlighted?: boolean; // ADD THIS LINE
   allTags: Tag[];
-  hypotheses: Array<{ id: string; content: string; createdAt: Date }>;
+  hypotheses: Array<{ id: string; content: string; createdAt: string }>;
 }
 
 const PRESET_COLORS = [

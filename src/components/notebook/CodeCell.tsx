@@ -35,7 +35,7 @@ interface CodeCellProps {
     onGenerateCode?: (id: string, query: string) => void;
     onAddInsight?: (cellId: string) => void;
     onUpdateHypothesisTags?: (cellId: string, tags: string[]) => void;
-    hypotheses?: Array<{ id: string; content: string; createdAt: Date }>;
+    hypotheses?: Array<{ id: string; content: string; createdAt: string }>;
     canMoveUp: boolean;
     canMoveDown: boolean;
     datasetInfo?: any;
