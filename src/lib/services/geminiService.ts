@@ -106,75 +106,92 @@ private parseGeminiJSON(response: string): any {
    * Build evaluation prompt for Gemini
    */
   private buildEvaluationPrompt(claim: ClaimStructure, notebookContext: any): string {
-    return `You are an expert research analyst evaluating claims using the Toulmin argumentation framework.
-
-**CLAIM TO EVALUATE:**
-"${claim.text}"
-
-**CLAIM TYPE:** ${claim.type}
-
-**NOTEBOOK CONTEXT:**
-
-Hypotheses:
-${notebookContext.hypotheses.map((h: any) => `- ${h.content}`).join('\n') || 'None'}
-
-Analyses:
-${notebookContext.cells.map((c: any) => `
-Analysis: ${c.query}
-Output: ${c.output?.text || 'No output'}
-`).join('\n') || 'None'}
-
-Insights:
-${notebookContext.insights.map((i: any) => `- ${i.content}`).join('\n') || 'None'}
-
-**YOUR TASK:**
-Evaluate this claim using Toulmin's framework and return a JSON object with this EXACT structure:
-
-{
-  "grounds": [
-    {
-      "content": "specific evidence text from notebook",
-      "sourceType": "insight" or "cell_output",
-      "relevanceScore": 0.0-1.0,
-      "strengthScore": 0.0-1.0
+    return `You are an expert research analyst evaluating substantive claims using the Toulmin argumentation framework.
+  
+  **CLAIM TO EVALUATE:**
+  "${claim.text}"
+  
+  **CLAIM TYPE:** ${claim.type}
+  
+  **NOTEBOOK CONTEXT:**
+  
+  Hypotheses:
+  ${notebookContext.hypotheses?.map((h: any) => `- ${h.content}`).join('\n') || 'None'}
+  
+  Analyses:
+  ${notebookContext.cells?.map((c: any) => `
+  Analysis: ${c.query}
+  Output: ${c.output?.text || 'No output'}
+  `).join('\n') || 'None'}
+  
+  Insights:
+  ${notebookContext.insights?.map((i: any) => `- ${i.content}`).join('\n') || 'None'}
+  
+  **EVALUATION GUIDELINES:**
+  
+  CRITICAL - DO NOT EVALUATE:
+  - Structural text: headings, section titles, "Introduction", "Conclusion", "Methods", "Results", etc.
+  - Transitional phrases: "In this section...", "As we will see...", "This paper argues..."
+  - Meta-commentary about the writing itself
+  
+  ONLY EVALUATE: Substantive research claims that make assertions about data, relationships, or findings.
+  
+  STRATEGIC ISSUE DETECTION:
+  - Return MAXIMUM 1-3 issues per claim - only the most critical problems
+  - Critical severity: ONLY for claims with zero supporting evidence or fundamental logical flaws
+  - Warning severity: For claims with weak/incomplete evidence or missing qualifiers
+  - Info severity: For minor improvements or style suggestions
+  - If the claim is reasonably well-supported, return ZERO issues
+  
+  **YOUR TASK:**
+  Evaluate this claim ONLY if it's a substantive research claim. Return JSON with this EXACT structure:
+  
+  {
+    "grounds": [
+      {
+        "content": "specific evidence text from notebook",
+        "sourceType": "insight" or "cell_output",
+        "relevanceScore": 0.0-1.0,
+        "strengthScore": 0.0-1.0
+      }
+    ],
+    "warrant": {
+      "statement": "one sentence explaining logical link between evidence and claim",
+      "type": "causal" or "statistical" or "comparative" or "logical",
+      "confidence": 0.0-1.0,
+      "acceptanceLevel": "widely-accepted" or "domain-specific" or "controversial"
+    },
+    "overallScore": 0-100,
+    "strength": "strong" or "moderate" or "weak" or "unsupported",
+    "issues": [
+      {
+        "type": "no-evidence" or "weak-evidence" or "overclaim" or "missing-qualifier" or "causation-correlation",
+        "severity": "critical" or "warning" or "info",
+        "message": "short description",
+        "explanation": "detailed explanation"
+      }
+    ],
+    "gaps": [
+      {
+        "type": "missing-variable" or "missing-relationship",
+        "description": "what analysis is missing",
+        "missingConcepts": ["concept1", "concept2"],
+        "importance": "critical" or "important" or "optional"
+      }
+    ],
+    "qualifier": {
+      "detected": ["existing qualifier words"],
+      "missing": ["suggested qualifiers like 'some', 'many', 'likely'"],
+      "appropriatenessScore": 0.0-1.0
     }
-  ],
-  "warrant": {
-    "statement": "one sentence explaining logical link between evidence and claim",
-    "type": "causal" or "statistical" or "comparative" or "logical",
-    "confidence": 0.0-1.0,
-    "acceptanceLevel": "widely-accepted" or "domain-specific" or "controversial"
-  },
-  "overallScore": 0-100,
-  "strength": "strong" or "moderate" or "weak" or "unsupported",
-  "issues": [
-    {
-      "type": "no-evidence" or "weak-evidence" or "overclaim" or "missing-qualifier" or "causation-correlation",
-      "severity": "critical" or "warning" or "info",
-      "message": "short description",
-      "explanation": "detailed explanation"
-    }
-  ],
-  "gaps": [
-    {
-      "type": "missing-variable" or "missing-relationship",
-      "description": "what analysis is missing",
-      "missingConcepts": ["concept1", "concept2"],
-      "importance": "critical" or "important" or "optional"
-    }
-  ],
-  "qualifier": {
-    "detected": ["existing qualifier words"],
-    "missing": ["suggested qualifiers like 'some', 'many', 'likely'"],
-    "appropriatenessScore": 0.0-1.0
   }
-}
-
-**IMPORTANT:**
-- Be thorough in finding evidence from the notebook
-- Score strength honestly based on evidence quality
-- Identify ALL issues with the claim
-- Return ONLY valid JSON, no other text`;
+  
+  **IMPORTANT:**
+  - If this is structural/transitional text, return empty grounds[] and issues[]
+  - Be thorough but SELECTIVE in finding evidence
+  - Return MAXIMUM 1-3 issues - prioritize ruthlessly
+  - Score strength honestly based on evidence quality
+  - Return ONLY valid JSON, no other text`;
   }
   
   /**
