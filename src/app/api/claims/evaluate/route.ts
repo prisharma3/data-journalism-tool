@@ -84,10 +84,14 @@ export async function POST(request: NextRequest) {
     };
 
     // Generate suggestions based on issues
-    const suggestions = geminiEvaluation.issues.map((issue: any) => ({
+// Generate suggestions based on issues
+const suggestions = geminiEvaluation.issues.map((issue: any) => {
+    const suggestionType = mapIssueToSuggestion(issue.type);
+    
+    return {
       id: generateId('suggestion'),
       claimId: evaluationRequest.claim.id,
-      type: mapIssueToSuggestion(issue.type),
+      type: suggestionType,
       severity: issue.severity,
       message: issue.message,
       explanation: issue.explanation,
@@ -96,7 +100,8 @@ export async function POST(request: NextRequest) {
       priority: issue.severity === 'critical' ? 90 : issue.severity === 'warning' ? 60 : 30,
       createdAt: new Date(),
       status: 'active' as const,
-    }));
+    };
+  });
 
     const response: ClaimEvaluationResponse = {
       claimId: evaluationRequest.claim.id,
@@ -118,12 +123,12 @@ export async function POST(request: NextRequest) {
 }
 
 function mapIssueToSuggestion(issueType: string): string {
-  const mapping: Record<string, string> = {
-    'no-evidence': 'add-analysis',
-    'weak-evidence': 'add-analysis',
-    'overclaim': 'weaken-claim',
-    'missing-qualifier': 'add-qualifier',
-    'causation-correlation': 'weaken-claim',
-  };
-  return mapping[issueType] || 'grammar';
-}
+    const mapping: Record<string, string> = {
+      'no-evidence': 'missing-evidence',
+      'weak-evidence': 'weak-support',
+      'overclaim': 'strong-language',
+      'missing-qualifier': 'strong-language',
+      'causation-correlation': 'logical-issue',
+    };
+    return mapping[issueType] || 'clarity';
+  }

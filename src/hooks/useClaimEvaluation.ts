@@ -229,41 +229,43 @@ export function useClaimEvaluation({
     }
   }, [notebookContext]);
 
-  // Debounced claim detection (trigger after user stops typing)
-  const debouncedDetect = useRef(
-    debounce(() => {
-      detectClaims();
-    }, 2000) // 2 second delay
-  ).current;
-
-  // Debounced remembrance agent
-  const debouncedRelevant = useRef(
-    debounce(() => {
-      getRelevantAnalyses();
-    }, 1500) // 1.5 second delay
-  ).current;
-
-  // Trigger detection when text changes
-  useEffect(() => {
-    if (enabled && text) {
-      debouncedDetect();
+// Trigger detection when text changes - with proper cleanup
+useEffect(() => {
+    if (!enabled || !text) {
+      if (text.length === 0) {
+        lastTextRef.current = '';
+      }
+      return;
     }
-  }, [text, enabled, debouncedDetect]);
+    
+    // Create a new debounced function for this effect
+    const debouncedDetect = debounce(() => {
+      detectClaims();
+    }, 2000);
+    
+    // Trigger debounced detection
+    debouncedDetect();
+    
+    // Cleanup
+    return () => {
+      debouncedDetect.cancel();
+    };
+  }, [text, enabled, detectClaims]); // Keep all dependencies
 
   // Trigger remembrance agent when cursor moves
   useEffect(() => {
-    if (enabled && text) {
-      debouncedRelevant();
-    }
-  }, [cursorPosition, text, enabled, debouncedRelevant]);
-
-  // Cleanup
-  useEffect(() => {
+    if (!enabled || !text) return;
+    
+    const debouncedRelevant = debounce(() => {
+      getRelevantAnalyses();
+    }, 1500);
+    
+    debouncedRelevant();
+    
     return () => {
-      debouncedDetect.cancel();
       debouncedRelevant.cancel();
     };
-  }, [debouncedDetect, debouncedRelevant]);
+  }, [cursorPosition, text, enabled, getRelevantAnalyses]); // Keep all dependencies
 
   // Auto-evaluate claims when they are detected
 useEffect(() => {

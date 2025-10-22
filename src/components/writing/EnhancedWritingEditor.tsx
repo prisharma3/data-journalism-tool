@@ -31,6 +31,13 @@ export function EnhancedWritingEditor({
     const [selectedEvaluation, setSelectedEvaluation] = useState<any | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [dismissedSuggestions, setDismissedSuggestions] = useState<Set<string>>(new Set());
+
+    const [expandedSuggestionId, setExpandedSuggestionId] = useState<string | null>(null);
+const [analysisSuggestions, setAnalysisSuggestions] = useState<{[key: string]: any}>({});
+
+const [modificationOptions, setModificationOptions] = useState<{[key: string]: any}>({});
+
+const [fixedPositions, setFixedPositions] = useState<Array<{from: number, to: number, fixedAt: Date}>>([]);
     
 // Sync with initialContent whenever it changes (from store)
 useEffect(() => {
@@ -61,13 +68,13 @@ useEffect(() => {
   });
 
 // Handle content change from editor
-// Handle content change from editor
 const handleContentChange = (newContent: string, newPos?: number) => {
     setContent(newContent);
     if (newPos !== undefined) {
       setCursorPosition(newPos);
     }
-    // Call parent's onChange if provided
+    
+    // Call parent's onContentChange if provided
     if (onContentChange) {
       onContentChange(newContent);
     }
@@ -78,96 +85,91 @@ const handleContentChange = (newContent: string, newPos?: number) => {
     if (!suggestion) return;
   
     if (suggestion.type === 'add-analysis') {
+      // If already expanded, collapse it
+      if (expandedSuggestionId === suggestionId) {
+        setExpandedSuggestionId(null);
+        return;
+      }
+  
+      // Expand and fetch analysis suggestions
+      setExpandedSuggestionId(suggestionId);
+      
       // Suggest analyses for missing evidence
       const claim = claims.find(c => c.id === suggestion.claimId);
       if (claim) {
         try {
           const result = await suggestAnalyses(claim.text, []);
           console.log('Analysis suggestions:', result.suggestions);
-          // TODO: Show analysis suggestions modal
-          alert('Analysis suggestions generated! Check console for now.');
+          
+          // Store the analysis suggestions for this suggestion ID
+          setAnalysisSuggestions(prev => ({
+            ...prev,
+            [suggestionId]: result.suggestions || []
+          }));
         } catch (err) {
           console.error('Failed to suggest analyses:', err);
         }
       }
     } else {
-      // Generate claim modifications and apply to text
-      const claim = claims.find(c => c.id === suggestion.claimId);
-      if (!claim) return;
-  
-      try {
-        const modificationType = 
-          suggestion.type === 'weaken-claim' ? 'weaken' :
-          suggestion.type === 'add-caveat' ? 'caveat' :
-          suggestion.type === 'add-qualifier' ? 'weaken' :
-          'weaken';
-  
-        // Get the full evaluation for this claim
-        const evalResponse = await fetch('/api/claims/evaluate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            claim,
-            notebookContext,
-          }),
-        });
-  
-        if (!evalResponse.ok) {
-          throw new Error('Failed to evaluate claim');
+        // If already expanded with modifications, collapse it
+        if (expandedSuggestionId === suggestionId && modificationOptions[suggestionId]) {
+          setExpandedSuggestionId(null);
+          return;
         }
-  
-        const evalData = await evalResponse.json();
-  
-        // Generate modifications
-        const result = await generateModifications(
-          claim.text,
-          evalData.toulminDiagram,
-          modificationType as any
-        );
-  
-        console.log('Modification suggestions:', result.suggestions);
-  
-        // Show user the options and let them pick one
-        if (result.suggestions && result.suggestions.length > 0) {
-          const choice = await showModificationChoice(result.suggestions, result.explanations);
-          
-          if (choice !== null) {
-            // Replace the claim text with the selected suggestion
-            const newText = 
-              content.substring(0, claim.position.from) +
-              result.suggestions[choice] +
-              content.substring(claim.position.to);
-            
-            handleContentChange(newText, claim.position.from);
-            
-            // Show success message
-            alert('Claim updated successfully!');
-          }
-        }
-      } catch (err) {
-        console.error('Failed to generate modifications:', err);
-        alert('Failed to generate suggestions. Please try again.');
-      }
-    }
-  };
-  
-  // Helper function to show modification choices
-  const showModificationChoice = (suggestions: string[], explanations: string[]): Promise<number | null> => {
-    return new Promise((resolve) => {
-      const message = suggestions.map((s, i) => `${i + 1}. ${s}\n   ${explanations[i]}`).join('\n\n');
-      const choice = prompt(`Choose a replacement (1-${suggestions.length}):\n\n${message}`);
       
-      if (choice === null) {
-        resolve(null);
-      } else {
-        const num = parseInt(choice) - 1;
-        if (num >= 0 && num < suggestions.length) {
-          resolve(num);
-        } else {
-          resolve(null);
+        // Expand and fetch modification suggestions
+        setExpandedSuggestionId(suggestionId);
+      
+        // Generate claim modifications
+        const claim = claims.find(c => c.id === suggestion.claimId);
+        if (!claim) return;
+      
+        try {
+          const modificationType = 
+            suggestion.type === 'weaken-claim' ? 'weaken' :
+            suggestion.type === 'add-caveat' ? 'caveat' :
+            suggestion.type === 'add-qualifier' ? 'weaken' :
+            'weaken';
+      
+          // Get the full evaluation for this claim
+          const evalResponse = await fetch('/api/claims/evaluate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              claim,
+              notebookContext,
+            }),
+          });
+      
+          if (!evalResponse.ok) {
+            throw new Error('Failed to evaluate claim');
+          }
+      
+          const evalData = await evalResponse.json();
+      
+          // Generate modifications
+          const result = await generateModifications(
+            claim.text,
+            evalData.toulminDiagram,
+            modificationType as any
+          );
+      
+          console.log('Modification suggestions:', result.suggestions);
+      
+          // Store the modification options for this suggestion ID
+          setModificationOptions(prev => ({
+            ...prev,
+            [suggestionId]: {
+              suggestions: result.suggestions || [],
+              explanations: result.explanations || [],
+              claim: claim
+            }
+          }));
+        } catch (err) {
+          console.error('Failed to generate modifications:', err);
+          alert('Failed to generate suggestions. Please try again.');
         }
       }
-    });
   };
 
   const handleDismissSuggestion = (suggestionId: string) => {
@@ -260,15 +262,10 @@ const handleContentChange = (newContent: string, newPos?: number) => {
           </div>
         </div>
 
-        {/* Editor */}
-{/* Editor - Split View */}
+{/* Editor - Single editable view with inline claim highlights */}
 <div className="flex-1 overflow-y-auto bg-white">
-          <div className="grid grid-cols-2 gap-4 p-8 h-full">
-            {/* Editable textarea */}
+          <div className="max-w-4xl mx-auto p-8">
             <div className="relative">
-              <label className="text-xs font-medium text-gray-500 mb-2 block">
-                Edit Mode
-              </label>
               <textarea
                 value={content}
                 onChange={(e) => {
@@ -280,24 +277,42 @@ const handleContentChange = (newContent: string, newPos?: number) => {
                   setCursorPosition(target.selectionStart);
                 }}
                 placeholder="Start writing your article... Claims will be automatically detected and evaluated."
-                className="w-full h-full p-4 text-base leading-relaxed resize-none focus:outline-none font-serif border border-gray-200 rounded-lg"
+                className="w-full min-h-[calc(100vh-200px)] p-6 text-base leading-relaxed resize-none focus:outline-none font-serif border-0 bg-transparent"
+                style={{
+                  lineHeight: '1.8',
+                  fontSize: '16px',
+                  overflow: 'hidden',
+                }}
               />
+              
+              {/* Overlay with claim underlines */}
+              {claims.length > 0 && (
+                <div 
+                  className="absolute top-0 left-0 right-0 pointer-events-none p-6 text-base leading-relaxed font-serif"
+                  style={{
+                    lineHeight: '1.8',
+                    fontSize: '16px',
+                    color: 'transparent',
+                    whiteSpace: 'pre-wrap',
+                    wordBreak: 'break-word',
+                  }}
+                >
+                  <TextWithClaims
+                    text={content}
+                    claims={claims}
+                    suggestions={suggestions}
+                    onClaimClick={handleClaimClick}
+                  />
+                </div>
+              )}
             </div>
-
-            {/* Preview with claim underlines */}
-            <div className="relative border-l border-gray-200 pl-4">
-              <label className="text-xs font-medium text-gray-500 mb-2 block">
-                Preview with Claims ({claims.length})
-              </label>
-              <div className="p-4 bg-gray-50 rounded-lg min-h-full">
-                <TextWithClaims
-                  text={content}
-                  claims={claims}
-                  suggestions={suggestions}
-                  onClaimClick={handleClaimClick}
-                />
+            
+            {/* Claim count indicator */}
+            {claims.length > 0 && (
+              <div className="mt-4 text-sm text-gray-500 text-center">
+                {claims.length} claim{claims.length !== 1 ? 's' : ''} detected • Click underlined text for details
               </div>
-            </div>
+            )}
           </div>
         </div>
 
@@ -311,14 +326,53 @@ const handleContentChange = (newContent: string, newPos?: number) => {
 
 {/* Suggestion Panel */}
 <SuggestionPanel
-  suggestions={suggestions.filter(s => !dismissedSuggestions.has(s.id))}
-        relevantAnalyses={relevantAnalyses}
-        isLoadingSuggestions={isEvaluating}
-        isLoadingAnalyses={isLoadingRelevant}
-        onAcceptSuggestion={handleAcceptSuggestion}
-        onDismissSuggestion={handleDismissSuggestion}
-        onViewEvidence={handleViewEvidence}
-      />
+  suggestions={suggestions.filter(s => {
+    // Filter out dismissed suggestions
+    if (dismissedSuggestions.has(s.id)) return false;
+    
+    // Filter out suggestions for claims that were recently fixed
+    const claim = claims.find(c => c.id === s.claimId);
+    if (!claim) return true;
+    
+    const wasRecentlyFixed = fixedPositions.some(fixed => {
+      const overlap = !(claim.position.to <= fixed.from || claim.position.from >= fixed.to);
+      const recentlyFixed = (new Date().getTime() - fixed.fixedAt.getTime()) < 5000; // 5 seconds
+      return overlap && recentlyFixed;
+    });
+    
+    return !wasRecentlyFixed;
+  })}
+  relevantAnalyses={relevantAnalyses}
+  isLoadingSuggestions={isEvaluating}
+  isLoadingAnalyses={isLoadingRelevant}
+  onAcceptSuggestion={handleAcceptSuggestion}
+  onDismissSuggestion={handleDismissSuggestion}
+  onViewEvidence={handleViewEvidence}
+  expandedSuggestionId={expandedSuggestionId}
+  analysisSuggestions={analysisSuggestions}
+  modificationOptions={modificationOptions}
+  onCloseExpanded={() => setExpandedSuggestionId(null)}
+  onSelectModification={(suggestionId, modificationIndex) => {
+    const options = modificationOptions[suggestionId];
+    if (!options) return;
+    
+    const claim = options.claim;
+    const newText = 
+      content.substring(0, claim.position.from) +
+      options.suggestions[modificationIndex] +
+      content.substring(claim.position.to);
+    
+    // Mark this position as fixed
+    setFixedPositions(prev => [...prev, {
+      from: claim.position.from,
+      to: claim.position.from + options.suggestions[modificationIndex].length,
+      fixedAt: new Date()
+    }]);
+    
+    handleContentChange(newText, claim.position.from);
+    setExpandedSuggestionId(null);
+  }}
+/>
 
       {/* Toulmin Modal */}
       <ToulminModal

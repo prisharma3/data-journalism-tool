@@ -12,6 +12,11 @@ interface ProjectStore {
   writingContent: WritingContent | null;
   articleContent: string; 
 
+    // Add these new fields:
+    writingClaims: any[];
+    writingSuggestions: any[];
+    writingRelevantAnalyses: any[];
+
   
   // Notebook state (moved from NotebookCanvas local state)
   cells: any[];
@@ -57,6 +62,11 @@ interface ProjectStore {
   updateWritingContent: (updates: Partial<WritingContent>) => void;
   setArticleContent: (content: string) => void; 
   
+  // Add these new actions:
+  setWritingClaims: (claims: any[]) => void;
+  setWritingSuggestions: (suggestions: any[]) => void;
+  setWritingRelevantAnalyses: (analyses: any[]) => void;
+  
   // Notebook cell actions
   setCells: (cells: any[]) => void;
   addCell: (cell: any) => void;
@@ -89,6 +99,10 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   tags: [],
   writingContent: null,
   articleContent: '',
+
+  writingClaims: [],
+  writingSuggestions: [],
+  writingRelevantAnalyses: [], 
   isLoading: false,
   error: null,
   
@@ -204,8 +218,11 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   setLoading: (loading) => set({ isLoading: loading }),
   setError: (error) => set({ error }),
 
-
   setArticleContent: (content) => set({ articleContent: content }),
+
+  setWritingClaims: (claims) => set({ writingClaims: claims }),
+  setWritingSuggestions: (suggestions) => set({ writingSuggestions: suggestions }),
+  setWritingRelevantAnalyses: (analyses) => set({ writingRelevantAnalyses: analyses }),
   
   clearProject: () => set({
     currentProject: null,
@@ -216,6 +233,9 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     tags: [],
     writingContent: null,
     articleContent: '',
+    writingClaims: [],
+    writingSuggestions: [],
+    writingRelevantAnalyses: [],
     cells: [],
     dataset: null,
     selectedCellId: undefined,
