@@ -10,20 +10,46 @@ interface WritingContainerProps {
   projectId: string;
 }
 
-export default function WritingContainer({ projectId }: WritingContainerProps) {
-  const { token } = useAuthStore();
-  const {
-    cells,
-    dataset,
-    hypotheses,
-    insights,
-    activeHypothesisId,
-  } = useProjectStore();
+// export default function WritingContainer({ projectId }: WritingContainerProps) {
+//   const { token } = useAuthStore();
+//   const {
+//     cells,
+//     dataset,
+//     hypotheses,
+//     insights,
+//     activeHypothesisId,
+//   } = useProjectStore();
 
-  const [articleContent, setArticleContent] = useState<string>('');
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [wordCount, setWordCount] = useState(0);
+// //   const [articleContent, setArticleContent] = useState<string>('');
+// const { articleContent: storedContent, setArticleContent: setStoredContent } = useProjectStore();
+// const [articleContent, setArticleContent] = useState<string>(storedContent || '');
+//   const [isLoading, setIsLoading] = useState(true);
+//   const [error, setError] = useState<string | null>(null);
+//   const [wordCount, setWordCount] = useState(0);
+
+export default function WritingContainer({ projectId }: WritingContainerProps) {
+    const { token } = useAuthStore();
+    const {
+      cells,
+      dataset,
+      hypotheses,
+      insights,
+      activeHypothesisId,
+      articleContent: storedContent,  // Get from store
+      setArticleContent: setStoredContent,  // Get action from store
+    } = useProjectStore();
+  
+    const [articleContent, setArticleContent] = useState<string>(storedContent || '');
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+    const [wordCount, setWordCount] = useState(0);
+  
+    // Sync local state with store on mount
+    useEffect(() => {
+      if (storedContent) {
+        setArticleContent(storedContent);
+      }
+    }, []); // Only on mount
 
   // Load article content on mount
   useEffect(() => {
@@ -86,9 +112,11 @@ export default function WritingContainer({ projectId }: WritingContainerProps) {
   // Use auto-save hook
   useAutoSave(articleContent, saveArticle, 3000); // Save every 3 seconds
 
-  // Handle content change from editor
-  const handleContentChange = (newContent: string) => {
+// Handle content change from editor
+const handleContentChange = (newContent: string) => {
     setArticleContent(newContent);
+    setStoredContent(newContent); // Save to store immediately
+    
     // Calculate word count (simple approach)
     const words = newContent.trim().split(/\s+/).filter(word => word.length > 0);
     setWordCount(words.length);

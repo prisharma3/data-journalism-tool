@@ -38,13 +38,26 @@ export function useClaimEvaluation({
    * Detect claims in text
    */
   const detectClaims = useCallback(async () => {
-    if (!enabled || !text || text === lastTextRef.current) return;
+    console.log('🔍 detectClaims called:', { 
+        enabled, 
+        textLength: text?.length, 
+        lastTextLength: lastTextRef.current?.length,
+        sameAsLast: text === lastTextRef.current 
+      });
+      
+      if (!enabled || !text || text === lastTextRef.current) {
+        console.log('❌ Skipping detection');
+        return;
+      }
+      
+      console.log('✅ Starting claim detection...');
     
     setIsDetecting(true);
     setError(null);
     lastTextRef.current = text;
 
     try {
+        console.log('📡 POST /api/claims/detect');
       const response = await fetch('/api/claims/detect', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -61,13 +74,12 @@ export function useClaimEvaluation({
       }
 
       const data = await response.json();
-      console.log('Claims detected:', data.claims.length); // ADD THIS
+      console.log('Claims detected:', data.claims.length); 
       setClaims(data.claims);
       
       // Auto-evaluate claims
       if (data.claims.length > 0) {
-        console.log('Starting evaluation...'); // ADD THIS
-        evaluateClaims(data.claims);
+        console.log('Starting evaluation...'); 
       } else {
         setSuggestions([]);
       }
@@ -83,12 +95,15 @@ export function useClaimEvaluation({
    * Evaluate detected claims
    */
   const evaluateClaims = useCallback(async (claimsToEvaluate: ClaimStructure[]) => {
+    console.log('🔬 Starting evaluation for', claimsToEvaluate.length, 'claims');
     setIsEvaluating(true);
     const allSuggestions: WritingSuggestion[] = [];
-
+  
     try {
       // Evaluate each claim
       for (const claim of claimsToEvaluate) {
+        console.log('📡 POST /api/claims/evaluate for claim:', claim.text.substring(0, 50));
+        
         const response = await fetch('/api/claims/evaluate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -97,13 +112,23 @@ export function useClaimEvaluation({
             notebookContext,
           }),
         });
-
+  
         if (response.ok) {
           const data = await response.json();
-          allSuggestions.push(...data.suggestions);
+          console.log('✅ Evaluation response:', {
+            suggestions: data.suggestions?.length || 0,
+            issues: data.toulminDiagram?.issues?.length || 0
+          });
+          
+          if (data.suggestions && data.suggestions.length > 0) {
+            allSuggestions.push(...data.suggestions);
+          }
+        } else {
+          console.error('❌ Evaluation failed:', response.status, await response.text());
         }
       }
-
+  
+      console.log('📊 Total suggestions collected:', allSuggestions.length);
       setSuggestions(allSuggestions);
     } catch (err: any) {
       console.error('Claim evaluation error:', err);

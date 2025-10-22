@@ -3,7 +3,7 @@
  * TipTap editor with claim evaluation integration
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect} from 'react';
 import { useClaimEvaluation } from '@/hooks/useClaimEvaluation';
 import { SuggestionPanel } from './SuggestionPanel';
 import { TextWithClaims } from './TextWithClaims';
@@ -24,13 +24,20 @@ export function EnhancedWritingEditor({
   initialContent = '',
   onContentChange,
 }: EnhancedWritingEditorProps) {
-  const [content, setContent] = useState(initialContent);
-  const [cursorPosition, setCursorPosition] = useState(0);
-  const [enabled, setEnabled] = useState(true);
-  const [selectedClaimId, setSelectedClaimId] = useState<string | null>(null);
-const [selectedEvaluation, setSelectedEvaluation] = useState<any | null>(null);
-const [isModalOpen, setIsModalOpen] = useState(false);
-const [dismissedSuggestions, setDismissedSuggestions] = useState<Set<string>>(new Set()); 
+    const [content, setContent] = useState(initialContent);
+    const [cursorPosition, setCursorPosition] = useState(0);
+    const [enabled, setEnabled] = useState(true);
+    const [selectedClaimId, setSelectedClaimId] = useState<string | null>(null);
+    const [selectedEvaluation, setSelectedEvaluation] = useState<any | null>(null);
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [dismissedSuggestions, setDismissedSuggestions] = useState<Set<string>>(new Set());
+    
+    // Only update content if initialContent changes AND local content is empty
+    useEffect(() => {
+      if (initialContent && !content) {
+        setContent(initialContent);
+      }
+    }, [initialContent]); // Remove 'content' from dependencies
 
   // Use claim evaluation hook
   const {
@@ -53,10 +60,14 @@ const [dismissedSuggestions, setDismissedSuggestions] = useState<Set<string>>(ne
     enabled,
   });
 
-  const handleContentChange = (newContent: string, newCursorPos: number) => {
-    setContent(newContent);
-    setCursorPosition(newCursorPos);
-    onContentChange?.(newContent);
+// Handle content change from editor
+const handleContentChange = (newContent: string) => {
+    setArticleContent(newContent);
+    setStoredContent(newContent); // Save to store immediately
+    
+    // Calculate word count (simple approach)
+    const words = newContent.trim().split(/\s+/).filter(word => word.length > 0);
+    setWordCount(words.length);
   };
 
   const handleAcceptSuggestion = async (suggestionId: string) => {
@@ -198,6 +209,8 @@ const [dismissedSuggestions, setDismissedSuggestions] = useState<Set<string>>(ne
     console.log('View evidence from cell:', cellId);
     alert(`Evidence viewing will open the notebook and highlight cell: ${cellId}`);
   };
+
+
 
   return (
     <div className="flex h-full">

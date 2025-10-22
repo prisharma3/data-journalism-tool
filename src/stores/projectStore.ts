@@ -10,6 +10,8 @@ interface ProjectStore {
   insights: Insight[];
   tags: Tag[];
   writingContent: WritingContent | null;
+  articleContent: string; 
+
   
   // Notebook state (moved from NotebookCanvas local state)
   cells: any[];
@@ -53,6 +55,7 @@ interface ProjectStore {
   
   setWritingContent: (content: WritingContent | null) => void;
   updateWritingContent: (updates: Partial<WritingContent>) => void;
+  setArticleContent: (content: string) => void; 
   
   // Notebook cell actions
   setCells: (cells: any[]) => void;
@@ -85,6 +88,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   insights: [],
   tags: [],
   writingContent: null,
+  articleContent: '',
   isLoading: false,
   error: null,
   
@@ -97,6 +101,8 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   
   // Active context
   activeHypothesisId: null,
+
+
 
   // Project actions
   setCurrentProject: (project) => set({ currentProject: project }),
@@ -197,6 +203,9 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   
   setLoading: (loading) => set({ isLoading: loading }),
   setError: (error) => set({ error }),
+
+
+  setArticleContent: (content) => set({ articleContent: content }),
   
   clearProject: () => set({
     currentProject: null,
@@ -206,6 +215,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     insights: [],
     tags: [],
     writingContent: null,
+    articleContent: '',
     cells: [],
     dataset: null,
     selectedCellId: undefined,

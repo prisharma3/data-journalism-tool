@@ -804,12 +804,11 @@ const handleSaveInsight = useCallback((content: string, tagId: string, hypothesi
 
 {/* Two Column Layout: Notebook + Insights */}
 <div className="flex-1 flex overflow-hidden">
-  {/* Left Column: Notebook Content - Resizable */}
-  <div 
-    ref={notebookScrollRef} 
-    className="overflow-y-auto p-4 flex-shrink-0"
-    style={{ width: `calc(100% - ${insightsPanelWidth}px - 1px)` }}
-  >
+{/* Left Column: Notebook Content - Takes remaining space */}
+<div 
+  ref={notebookScrollRef} 
+  className="flex-1 overflow-y-auto overflow-x-hidden p-4 min-w-0"
+>
 
 {/* Dataset Upload Section */}
 <div id="section-dataset" className="mb-4">
