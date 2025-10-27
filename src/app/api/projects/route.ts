@@ -68,29 +68,17 @@ export async function POST(request: NextRequest) {
     }
 
     // Create the project
-    const projectResult = await query(
-      'INSERT INTO projects (user_id, name, description) VALUES ($1, $2, $3) RETURNING id, name, description, created_at, updated_at',
-      [userId, name, description]
-    );
+const projectResult = await query(
+  'INSERT INTO projects (user_id, name, description) VALUES ($1, $2, $3) RETURNING id, name, description, created_at, updated_at',
+  [userId, name, description]
+);
 
-    const project = projectResult.rows[0];
+const project = projectResult.rows[0];
 
-    // Create an empty notebook for this project
-    await query(
-      'INSERT INTO notebooks (project_id, content) VALUES ($1, $2)',
-      [project.id, JSON.stringify({})]
-    );
-
-    // Create an empty article for this project
-    await query(
-      'INSERT INTO articles (project_id, content) VALUES ($1, $2)',
-      [project.id, '']
-    );
-
-    return NextResponse.json({
-      project,
-      message: 'Project created successfully'
-    });
+return NextResponse.json({
+  project,
+  message: 'Project created successfully'
+});
 
   } catch (error) {
     console.error('Create project error:', error);
