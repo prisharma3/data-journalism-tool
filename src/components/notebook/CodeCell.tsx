@@ -6,66 +6,72 @@ import { Play, Trash2, Plus, ChevronUp, ChevronDown, Check, X, Loader, Sparkles,
 import HypothesisTagSelector from './HypothesisTagSelector';
 
 interface CodeCellProps {
-    cell: {
-      id: string;
-      type: 'code';
-      content: string;
-      query?: string;
-      hypothesisTags?: string[];
-      output?: {
-        text?: string;
-        plot?: string;
-        executionTime?: number;
-      };
-      error?: string;
-      executionCount?: number;
-      isRunning?: boolean;
-      isGenerating?: boolean;
+  cell: {
+    id: string;
+    type: 'code';
+    content: string;
+    query?: string;
+    hypothesisTags?: string[];
+    output?: {
+      text?: string;
+      plot?: string;
+      executionTime?: number;
     };
-    isSelected: boolean;
-    isHighlighted?: boolean; // ADD THIS LINE
-    onExecute: (id: string) => void;
-    onDelete: (id: string) => void;
-    onUpdate: (id: string, content: string) => void;
-    onSelect: (id: string) => void;
-    onAddBelow: (id: string) => void;
-    onAddAbove: (id: string) => void;
-    onMoveUp?: (id: string) => void;
-    onMoveDown?: (id: string) => void;
-    onGenerateCode?: (id: string, query: string) => void;
-    onAddInsight?: (cellId: string) => void;
-    onUpdateHypothesisTags?: (cellId: string, tags: string[]) => void;
-    hypotheses?: Array<{ id: string; content: string; createdAt: string }>;
-    canMoveUp: boolean;
-    canMoveDown: boolean;
-    datasetInfo?: any;
-  }
+    error?: string;
+    executionCount?: number;
+    isRunning?: boolean;
+    isGenerating?: boolean;
+  };
+  isSelected: boolean;
+  isHighlighted?: boolean;
+  onExecute: (id: string) => void;
+  onDelete: (id: string) => void;
+  onUpdate: (id: string, content: string) => void;
+  onSelect: (id: string) => void;
+  onAddBelow: (id: string) => void;
+  onAddAbove: (id: string) => void;
+  onMoveUp?: (id: string) => void;
+  onMoveDown?: (id: string) => void;
+  onGenerateCode?: (id: string, query: string) => void;
+  onAddInsight?: (cellId: string) => void;
+  onUpdateHypothesisTags?: (cellId: string, tags: string[]) => void;
+  hypotheses?: Array<{ id: string; content: string; createdAt: string }>;
+  canMoveUp: boolean;
+  canMoveDown: boolean;
+  datasetInfo?: any;
+  viewMode: 'code' | 'text';
+  onToggleViewMode: () => void;
+  cellInsights: any[];
+}
 
-  export default function CodeCell({
-    cell,
-    isSelected,
-    isHighlighted = false, // ADD THIS LINE
-    onExecute,
-    onDelete,
-    onUpdate,
-    onSelect,
-    onAddBelow,
-    onAddAbove,
-    onMoveUp,
-    onMoveDown,
-    onGenerateCode,
-    onAddInsight,
-    onUpdateHypothesisTags,
-    hypotheses,
-    insights = [], // ADD THIS
-    tags = [], // ADD THIS
-    onUpdateInsight, // ADD THIS
-    onDeleteInsight, // ADD THIS
-    onAddTag, // ADD THIS
-    canMoveUp,
-    canMoveDown,
-    datasetInfo,
-  }: CodeCellProps) {
+export default function CodeCell({
+  cell,
+  isSelected,
+  isHighlighted = false,
+  onExecute,
+  onDelete,
+  onUpdate,
+  onSelect,
+  onAddBelow,
+  onAddAbove,
+  onMoveUp,
+  onMoveDown,
+  onGenerateCode,
+  onAddInsight,
+  onUpdateHypothesisTags,
+  hypotheses,
+  insights = [], 
+  tags = [], 
+  onUpdateInsight, 
+  onDeleteInsight, 
+  onAddTag, 
+  canMoveUp,
+  canMoveDown,
+  datasetInfo,
+  viewMode,
+  onToggleViewMode,
+  cellInsights,
+}: CodeCellProps) {
     const [isOutputCollapsed, setIsOutputCollapsed] = useState(false);
     const [isCellCollapsed, setIsCellCollapsed] = useState(false);
     
@@ -108,21 +114,33 @@ interface CodeCellProps {
   };
 
   return (
-<div
-  className="code-cell mb-2 bg-white rounded border transition-all"
-  onClick={() => onSelect(cell.id)}
-  onMouseEnter={() => setIsHovered(true)}
-  onMouseLeave={() => setIsHovered(false)}
-  style={{
-    borderWidth: isSelected ? '2px' : '1px',
-    borderColor: isHighlighted ? '#fbbf24' : (isSelected ? '#007acc' : '#e0e0e0'),
-    backgroundColor: isHighlighted ? '#fef3c7' : 'white',
-    boxShadow: isHighlighted ? '0 0 0 3px rgba(251, 191, 36, 0.3)' : 'none',
-  }}
->
-{/* Cell Toolbar */}
-<div
-  className="flex items-center justify-between px-2 py-1 bg-gray-50 border-b border-gray-200 transition-opacity"
+    <div
+      className="code-cell mb-2 bg-white rounded border transition-all"
+      onClick={() => onSelect(cell.id)}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      style={{
+        borderWidth: isSelected ? '2px' : '1px',
+        borderColor: isHighlighted ? '#fbbf24' : (isSelected ? '#007acc' : '#e0e0e0'),
+        backgroundColor: isHighlighted ? '#fef3c7' : 'white',
+        boxShadow: isHighlighted ? '0 0 0 3px rgba(251, 191, 36, 0.3)' : 'none',
+      }}
+    >
+      {/* NEW: View Mode Toggle Button */}
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          onToggleViewMode();
+        }}
+        className="absolute top-2 right-2 z-10 px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded border border-gray-300 transition-colors"
+        title={`Switch to ${viewMode === 'code' ? 'Text' : 'Code'} View`}
+      >
+        {viewMode === 'code' ? '📝 Text' : '💻 Code'}
+      </button>
+    
+    {/* Cell Toolbar */}
+    <div
+      className="flex items-center justify-between px-2 py-1 bg-gray-50 border-b border-gray-200 transition-opacity"
   style={{
     opacity: isHovered || isSelected ? 1 : 0.3,
   }}
@@ -319,96 +337,163 @@ interface CodeCellProps {
         </div>
       )}
 
-      {/* Code Editor */}
-      {!isCellCollapsed && cell.content && (
-        <div onKeyDown={handleKeyDown}>
-          <Editor
-            height="120px"
-            defaultLanguage="python"
-            value={cell.content}
-            onChange={(value) => onUpdate(cell.id, value || '')}
-            onMount={handleEditorDidMount}
-            theme="vs-light"
-            options={{
-              minimap: { enabled: false },
-              fontSize: 12,
-              lineNumbers: 'on',
-              scrollBeyondLastLine: false,
-              automaticLayout: true,
-              tabSize: 4,
-              wordWrap: 'on',
-              padding: { top: 8, bottom: 8 },
-            }}
-          />
-        </div>
-      )}
-
-
-{/* Hypothesis Tag Selector - NEW SECTION */}
-{onUpdateHypothesisTags && hypotheses && hypotheses.length > 0 && (
-  <div className="px-3 py-2 bg-gray-50 border-t border-gray-200">
-    <HypothesisTagSelector
-      hypotheses={hypotheses}
-      selectedTags={cell.hypothesisTags || []}
-      onTagsChange={(tags) => onUpdateHypothesisTags(cell.id, tags)}
-    />
-  </div>
-)}
-
-{/* Output Display */}
-{!isOutputCollapsed && (cell.output || cell.error) && (
-  <div
-    className="border-t border-gray-200 p-2 max-h-96 overflow-auto"
-    style={{
-      backgroundColor: cell.error ? '#ffebee' : '#fafafa',
-    }}
-  >
-    {/* Add Insight Button - Top Right */}
-    {cell.output && !cell.error && onAddInsight && (
-      <div className="flex justify-end mb-2">
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onAddInsight(cell.id);
+{/* Conditional Rendering: Code View or Text View */}
+{viewMode === 'code' ? (
+  <>
+    {/* Code Editor */}
+    {!isCellCollapsed && cell.content && (
+      <div onKeyDown={handleKeyDown}>
+        <Editor
+          height="120px"
+          defaultLanguage="python"
+          value={cell.content}
+          onChange={(value) => onUpdate(cell.id, value || '')}
+          onMount={handleEditorDidMount}
+          theme="vs-light"
+          options={{
+            minimap: { enabled: false },
+            fontSize: 12,
+            lineNumbers: 'on',
+            scrollBeyondLastLine: false,
+            automaticLayout: true,
+            tabSize: 4,
+            wordWrap: 'on',
+            padding: { top: 8, bottom: 8 },
           }}
-          className="flex items-center gap-1 px-3 py-1.5 bg-blue-500 text-white rounded text-xs hover:bg-blue-600 transition-colors shadow-sm"
-          title="Add Insight"
-        >
-          <Plus size={14} />
-          Add Insight
-        </button>
-      </div>
-    )}
-    
-    {cell.error && (
-      <div className="text-red-700 font-mono text-xs">
-        <strong>Error:</strong>
-        <pre className="mt-1 whitespace-pre-wrap">{cell.error}</pre>
-      </div>
-    )}
-
-    {cell.output?.text && (
-      <div className="font-mono text-xs">
-        <pre className="m-0 whitespace-pre-wrap">{cell.output.text}</pre>
-      </div>
-    )}
-
-    {cell.output?.plot && (
-      <div className="mt-2">
-        <img
-          src={cell.output.plot}
-          alt="Plot output"
-          className="max-w-full h-auto rounded"
         />
       </div>
     )}
 
-    {cell.output?.executionTime && (
-      <div className="text-[10px] text-gray-600 mt-1 italic">
-        Execution time: {cell.output.executionTime}ms
+    {/* Hypothesis Tag Selector - NEW SECTION */}
+    {onUpdateHypothesisTags && hypotheses && hypotheses.length > 0 && (
+      <div className="px-3 py-2 bg-gray-50 border-t border-gray-200">
+        <HypothesisTagSelector
+          hypotheses={hypotheses}
+          selectedTags={cell.hypothesisTags || []}
+          onTagsChange={(tags) => onUpdateHypothesisTags(cell.id, tags)}
+        />
       </div>
     )}
-  </div>
+
+    {/* Output Display */}
+    {!isOutputCollapsed && (cell.output || cell.error) && (
+      <div
+        className="border-t border-gray-200 p-2 max-h-96 overflow-auto"
+        style={{
+          backgroundColor: cell.error ? '#ffebee' : '#fafafa',
+        }}
+      >
+        {/* Add Insight Button - Top Right */}
+        {cell.output && !cell.error && onAddInsight && (
+          <div className="flex justify-end mb-2">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onAddInsight(cell.id);
+              }}
+              className="flex items-center gap-1 px-3 py-1.5 bg-blue-500 text-white rounded text-xs hover:bg-blue-600 transition-colors shadow-sm"
+              title="Add Insight"
+            >
+              <Plus size={14} />
+              Add Insight
+            </button>
+          </div>
+        )}
+        
+        {cell.error && (
+          <div className="text-red-700 font-mono text-xs">
+            <strong>Error:</strong>
+            <pre className="mt-1 whitespace-pre-wrap">{cell.error}</pre>
+          </div>
+        )}
+
+        {cell.output?.text && (
+          <div className="font-mono text-xs">
+            <pre className="m-0 whitespace-pre-wrap">{cell.output.text}</pre>
+          </div>
+        )}
+
+        {cell.output?.plot && (
+          <div className="mt-2">
+            <img
+              src={cell.output.plot}
+              alt="Plot output"
+              className="max-w-full h-auto rounded"
+            />
+          </div>
+        )}
+
+        {cell.output?.executionTime && (
+          <div className="text-[10px] text-gray-600 mt-1 italic">
+            Execution time: {cell.output.executionTime}ms
+          </div>
+        )}
+      </div>
+    )}
+  </>
+) : (
+  <>
+    {/* Text View: Show Insights Inline */}
+    <div className="p-4 space-y-3">
+      {cellInsights && cellInsights.length > 0 ? (
+        cellInsights.map((insight) => (
+          <div
+            key={insight.id}
+            className="p-3 bg-blue-50 border border-blue-200 rounded-lg"
+          >
+            <div className="flex items-start justify-between mb-2">
+              <span className="text-xs font-medium text-blue-700">
+                Insight
+              </span>
+            </div>
+            <p className="text-sm text-gray-800 whitespace-pre-wrap">
+              {insight.content}
+            </p>
+            {insight.hypothesisTags && insight.hypothesisTags.length > 0 && hypotheses && (
+              <div className="mt-2 flex flex-wrap gap-1">
+                {insight.hypothesisTags.map((tagId) => {
+                  const hyp = hypotheses.find(h => h.id === tagId);
+                  return hyp ? (
+                    <span
+                      key={tagId}
+                      className="px-2 py-0.5 text-xs rounded bg-purple-100 text-purple-700"
+                    >
+                      {hyp.content}
+                    </span>
+                  ) : null;
+                })}
+              </div>
+            )}
+          </div>
+        ))
+      ) : (
+        <div className="text-center py-8 text-gray-400">
+          <p className="text-sm">No insights for this cell yet</p>
+          {onAddInsight && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onAddInsight(cell.id);
+              }}
+              className="mt-2 text-xs text-blue-600 hover:text-blue-700"
+            >
+              + Add Insight
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+    
+    {/* Show collapsed code preview in text view */}
+    <details className="border-t border-gray-200 bg-gray-50">
+      <summary className="px-4 py-2 text-xs text-gray-600 cursor-pointer hover:bg-gray-100">
+        View Code
+      </summary>
+      <pre className="px-4 py-2 text-xs text-gray-700 overflow-x-auto">
+        <code>{cell.content}</code>
+      </pre>
+    </details>
+  </>
 )}
     </div>
   );

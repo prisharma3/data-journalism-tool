@@ -149,6 +149,32 @@ useEffect(() => {
 const [highlightedCellId, setHighlightedCellId] = useState<string | null>(null);
 const [highlightedInsightId, setHighlightedInsightId] = useState<string | null>(null);
 
+// NEW: View mode state
+const [globalViewMode, setGlobalViewMode] = useState<'code' | 'text'>('code');
+const [cellViewModes, setCellViewModes] = useState<Record<string, 'code' | 'text'>>({});
+
+// Helper to get effective view mode for a cell
+const getCellViewMode = (cellId: string): 'code' | 'text' => {
+  return cellViewModes[cellId] || globalViewMode;
+};
+
+// Toggle global view mode
+const toggleGlobalViewMode = () => {
+  const newMode = globalViewMode === 'code' ? 'text' : 'code';
+  setGlobalViewMode(newMode);
+  // Clear individual overrides when changing global mode
+  setCellViewModes({});
+};
+
+// Toggle individual cell view mode
+const toggleCellViewMode = (cellId: string) => {
+  setCellViewModes(prev => {
+    const currentMode = getCellViewMode(cellId);
+    const newMode = currentMode === 'code' ? 'text' : 'code';
+    return { ...prev, [cellId]: newMode };
+  });
+};
+
 // Refs to track DOM elements
 const cellRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 const insightRefs = useRef<Map<string, HTMLDivElement>>(new Map());
@@ -778,6 +804,7 @@ const handleSaveInsight = useCallback((content: string, tagId: string, hypothesi
   return (
 <div className="h-full flex flex-col bg-gray-50">
 {/* Notebook Toolbar */}
+{/* Notebook Toolbar */}
 <div className="flex items-center gap-2 p-2 bg-white border-b border-gray-200">
   <Button
     onClick={executeAllCells}
@@ -808,6 +835,33 @@ const handleSaveInsight = useCallback((content: string, tagId: string, hypothesi
     <Plus size={16} />
     Add Cell
   </Button>
+
+  {/* NEW: View Mode Toggle */}
+  <div className="ml-auto flex items-center gap-2">
+    <span className="text-xs text-gray-600">View:</span>
+    <div className="flex items-center bg-gray-100 rounded-md p-0.5">
+      <button
+        onClick={toggleGlobalViewMode}
+        className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
+          globalViewMode === 'code'
+            ? 'bg-white text-blue-600 shadow-sm'
+            : 'text-gray-600 hover:text-gray-900'
+        }`}
+      >
+        Code View
+      </button>
+      <button
+        onClick={toggleGlobalViewMode}
+        className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
+          globalViewMode === 'text'
+            ? 'bg-white text-blue-600 shadow-sm'
+            : 'text-gray-600 hover:text-gray-900'
+        }`}
+      >
+        Text View
+      </button>
+    </div>
+  </div>
 </div>
 
 {/* Two Column Layout: Notebook + Insights */}
@@ -966,26 +1020,29 @@ const handleSaveInsight = useCallback((content: string, tagId: string, hypothesi
             if (el) cellRefs.current.set(cell.id, el);
           }}
         >
-          <CodeCell
-            cell={cell}
-            isSelected={selectedCellId === cell.id}
-            isHighlighted={highlightedCellId === cell.id}
-            onExecute={executeCell}
-            onDelete={deleteCell}
-            onUpdate={updateCell}
-            onSelect={selectCell}
-            onAddAbove={(id) => addCell(id, 'above')}
-            onAddBelow={(id) => addCell(id, 'below')}
-            onMoveUp={(id) => moveCell(id, 'up')}
-            onMoveDown={(id) => moveCell(id, 'down')}
-            onGenerateCode={handleGenerateCode}
-            onAddInsight={handleOpenInsightModal}
-            onUpdateHypothesisTags={handleUpdateCellHypothesisTags}
-            hypotheses={hypotheses}
-            canMoveUp={index > 0}
-            canMoveDown={index < filteredCells.length - 1}
-            datasetInfo={dataset?.summary}
-          />
+<CodeCell
+  cell={cell}
+  isSelected={selectedCellId === cell.id}
+  isHighlighted={highlightedCellId === cell.id}
+  onExecute={executeCell}
+  onDelete={deleteCell}
+  onUpdate={updateCell}
+  onSelect={selectCell}
+  onAddAbove={(id) => addCell(id, 'above')}
+  onAddBelow={(id) => addCell(id, 'below')}
+  onMoveUp={(id) => moveCell(id, 'up')}
+  onMoveDown={(id) => moveCell(id, 'down')}
+  onGenerateCode={handleGenerateCode}
+  onAddInsight={handleOpenInsightModal}
+  onUpdateHypothesisTags={handleUpdateCellHypothesisTags}
+  hypotheses={hypotheses}
+  canMoveUp={index > 0}
+  canMoveDown={index < filteredCells.length - 1}
+  datasetInfo={dataset?.summary}
+  viewMode={getCellViewMode(cell.id)}
+  onToggleViewMode={() => toggleCellViewMode(cell.id)}
+  cellInsights={insights.filter(i => i.cellId === cell.id)}
+/>
         </div>
       ))
 )}

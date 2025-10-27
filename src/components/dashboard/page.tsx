@@ -98,7 +98,7 @@ export default function DashboardPage() {
         setShowCreateModal(false);
         setNewProjectName('');
         setNewProjectDescription('');
-        router.push(`/project/${data.project.id}/notebook`);
+        router.push(`/project/${data.project.id}`);
       } else {
         setError('Failed to create project');
       }
@@ -214,7 +214,7 @@ export default function DashboardPage() {
                   <div className="flex items-start justify-between">
                     <CardTitle 
                       className="text-lg cursor-pointer hover:text-blue-600"
-                      onClick={() => router.push(`/project/${project.id}/notebook`)}
+                      onClick={() => router.push(`/project/${project.id}`)}
                     >
                       {project.name}
                     </CardTitle>
@@ -235,7 +235,7 @@ export default function DashboardPage() {
                 </CardHeader>
                 <CardContent 
                   className="cursor-pointer" 
-                  onClick={() => router.push(`/project/${project.id}/notebook`)}
+                  onClick={() => router.push(`/project/${project.id}`)}
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center text-sm text-gray-600">

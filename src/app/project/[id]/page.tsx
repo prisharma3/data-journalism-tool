@@ -3,26 +3,30 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuthStore } from '@/stores/authStore';
-
-// Import the three main components
 import Minimap from '@/components/minimap/Minimap';
 import NotebookCanvas from '@/components/notebook/NotebookCanvas';
-import WritingEditor from '@/components/writing/WritingEditor';
+import WritingContainer from '@/components/writing/WritingContainer';
+import { GripVertical } from 'lucide-react';
 
-export default function NotebookPage() {
+export default function ProjectPage() {
   const params = useParams();
   const router = useRouter();
   const { isAuthenticated, user } = useAuthStore();
   const [isLoading, setIsLoading] = useState(true);
-  const [projectId] = useState(params.id as string);
+  const projectId = params.id as string;
   
-  // Resizable panels state
-  const [minimapWidth, setMinimapWidth] = useState(45); // Decreased from 256px
-  const [writingWidth, setWritingWidth] = useState(384); // 96 * 4 = 384px
+  // Panel widths
+  const [minimapWidth, setMinimapWidth] = useState(60);
+  const [writingWidth, setWritingWidth] = useState(400);
   const [isDraggingLeft, setIsDraggingLeft] = useState(false);
   const [isDraggingRight, setIsDraggingRight] = useState(false);
   
   const containerRef = useRef<HTMLDivElement>(null);
+
+  const MIN_MINIMAP = 48;
+  const MAX_MINIMAP = 200;
+  const MIN_WRITING = 300;
+  const MAX_WRITING = 600;
 
   useEffect(() => {
     if (!isAuthenticated || !user) {
@@ -32,16 +36,14 @@ export default function NotebookPage() {
     setIsLoading(false);
   }, [isAuthenticated, user, router]);
 
-  // Handle mouse move for left divider (minimap)
+  // Left divider drag (minimap resize)
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       if (isDraggingLeft && containerRef.current) {
         const containerRect = containerRef.current.getBoundingClientRect();
         const newWidth = e.clientX - containerRect.left;
-        
-        // Min 150px, Max 400px for minimap
-        if (newWidth >= 50 && newWidth <= 150) {
-            setMinimapWidth(newWidth);
+        if (newWidth >= MIN_MINIMAP && newWidth <= MAX_MINIMAP) {
+          setMinimapWidth(newWidth);
         }
       }
     };
@@ -53,23 +55,25 @@ export default function NotebookPage() {
     if (isDraggingLeft) {
       document.addEventListener('mousemove', handleMouseMove);
       document.addEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
     }
 
     return () => {
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
     };
   }, [isDraggingLeft]);
 
-  // Handle mouse move for right divider (writing panel)
+  // Right divider drag (writing panel resize)
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       if (isDraggingRight && containerRef.current) {
         const containerRect = containerRef.current.getBoundingClientRect();
         const newWidth = containerRect.right - e.clientX;
-        
-        // Min 300px, Max 600px for writing panel
-        if (newWidth >= 300 && newWidth <= 600) {
+        if (newWidth >= MIN_WRITING && newWidth <= MAX_WRITING) {
           setWritingWidth(newWidth);
         }
       }
@@ -82,11 +86,15 @@ export default function NotebookPage() {
     if (isDraggingRight) {
       document.addEventListener('mousemove', handleMouseMove);
       document.addEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
     }
 
     return () => {
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
     };
   }, [isDraggingRight]);
 
@@ -101,10 +109,9 @@ export default function NotebookPage() {
   return (
     <div 
       ref={containerRef}
-      className="min-h-screen bg-gray-50 flex select-none"
-      style={{ cursor: isDraggingLeft || isDraggingRight ? 'col-resize' : 'default' }}
+      className="min-h-screen bg-gray-50 flex"
     >
-      {/* Left Column - Minimap (Resizable, Smaller) */}
+      {/* Panel 1: Minimap */}
       <div 
         className="bg-white border-r border-gray-200 flex-shrink-0"
         style={{ width: `${minimapWidth}px` }}
@@ -112,29 +119,37 @@ export default function NotebookPage() {
         <Minimap projectId={projectId} />
       </div>
 
-      {/* Left Divider (Resize Handle) */}
+      {/* Left Resize Handle */}
       <div
-        className="w-1 bg-gray-200 hover:bg-blue-500 cursor-col-resize flex-shrink-0 transition-colors"
+        className="w-1 bg-gray-200 hover:bg-blue-500 cursor-col-resize flex-shrink-0 transition-colors relative group"
         onMouseDown={() => setIsDraggingLeft(true)}
-      />
+      >
+        <div className="absolute inset-0 flex items-center justify-center">
+          <GripVertical className="w-3 h-3 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+        </div>
+      </div>
 
-      {/* Center Column - Notebook + Insights (Flexible) */}
+      {/* Panel 2: Notebook (Code + Insights) */}
       <div className="flex-1 bg-white border-r border-gray-200 min-w-0">
         <NotebookCanvas projectId={projectId} />
       </div>
 
-      {/* Right Divider (Resize Handle) */}
+      {/* Right Resize Handle */}
       <div
-        className="w-1 bg-gray-200 hover:bg-blue-500 cursor-col-resize flex-shrink-0 transition-colors"
+        className="w-1 bg-gray-200 hover:bg-blue-500 cursor-col-resize flex-shrink-0 transition-colors relative group"
         onMouseDown={() => setIsDraggingRight(true)}
-      />
+      >
+        <div className="absolute inset-0 flex items-center justify-center">
+          <GripVertical className="w-3 h-3 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+        </div>
+      </div>
 
-      {/* Right Column - Writing (Resizable) */}
+      {/* Panel 3: Writing */}
       <div 
         className="bg-white flex-shrink-0"
         style={{ width: `${writingWidth}px` }}
       >
-        <WritingEditor projectId={projectId} />
+        <WritingContainer projectId={projectId} />
       </div>
     </div>
   );
