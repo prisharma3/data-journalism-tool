@@ -66,24 +66,24 @@ export function TextWithClaims({
     const claimSuggestions = suggestions.filter(s => s.claimId === claim.id);
     
     if (claimSuggestions.length === 0) {
-      return 'decoration-green-500 decoration-2'; // No issues - solid green
+      return 'decoration-green-500 decoration-2 decoration-solid'; // No issues - solid green
     }
   
     // Get highest priority suggestion
     const topSuggestion = claimSuggestions.sort((a, b) => b.priority - a.priority)[0];
   
-    // Match colors to suggestion types (same as badge colors in SuggestionPanel)
+    // Match colors to suggestion types
     if (topSuggestion.type === 'remove-claim') {
-      return 'decoration-red-500 decoration-wavy decoration-2'; // Red wavy for remove
+      return 'decoration-red-500 decoration-wavy decoration-2'; // Red wavy
     }
     if (topSuggestion.type === 'add-analysis') {
-      return 'decoration-blue-500 decoration-2'; // Blue solid for add-analysis
+      return 'decoration-blue-500 decoration-2 decoration-solid'; // Blue solid
     }
     if (topSuggestion.type === 'weaken-claim' || topSuggestion.type === 'add-qualifier') {
-      return 'decoration-yellow-500 decoration-2'; // Yellow for weaken
+      return 'decoration-yellow-500 decoration-2 decoration-solid'; // Yellow
     }
     if (topSuggestion.type === 'add-caveat') {
-      return 'decoration-orange-500 decoration-2'; // Orange for caveat
+      return 'decoration-orange-500 decoration-2 decoration-solid'; // Orange
     }
     
     // Fallback to severity
@@ -91,9 +91,9 @@ export function TextWithClaims({
       return 'decoration-red-500 decoration-wavy decoration-2';
     }
     if (topSuggestion.severity === 'warning') {
-      return 'decoration-orange-500 decoration-2';
+      return 'decoration-orange-500 decoration-2 decoration-solid';
     }
-    return 'decoration-blue-500 decoration-2';
+    return 'decoration-blue-500 decoration-2 decoration-solid';
   };
 
   const getTooltip = (claim: ClaimStructure) => {

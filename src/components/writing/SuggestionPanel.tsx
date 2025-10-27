@@ -142,9 +142,10 @@ export function SuggestionPanel({
                 .filter(s => s.status === 'active')
                 .sort((a, b) => b.priority - a.priority)
                 .map((suggestion) => (
-<div key={suggestion.id} id={`suggestion-${suggestion.id}`}>
-  <div 
-onClick={() => {
+<div 
+  key={suggestion.id} 
+  id={`suggestion-${suggestion.id}`}
+  onClick={() => {
     if (onSuggestionClick) {
       onSuggestionClick(suggestion.claimId);
     }
