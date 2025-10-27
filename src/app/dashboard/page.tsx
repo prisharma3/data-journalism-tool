@@ -102,7 +102,7 @@ export default function DashboardPage() {
         setNewProjectName('');
         setNewProjectDescription('');
         // Navigate to the new project's notebook interface
-        router.push(`/project/${data.project.id}/notebook`);
+        router.push(`/project/${data.project.id}`);
       } else {
         setError('Failed to create project');
       }
@@ -216,7 +216,7 @@ export default function DashboardPage() {
               <Card key={project.id} className="hover:shadow-md transition-shadow">
                 <CardHeader>
                   <div className="flex justify-between items-start">
-                    <div className="flex-1 cursor-pointer" onClick={() => router.push(`/project/${project.id}/notebook`)}>
+                    <div className="flex-1 cursor-pointer" onClick={() => router.push(`/project/${project.id}`)}>
                       <CardTitle className="text-lg">{project.name}</CardTitle>
                       <CardDescription className="mt-1">
                         {project.description || 'No description'}
@@ -246,7 +246,7 @@ export default function DashboardPage() {
                     </div>
                   </div>
                 </CardHeader>
-                <CardContent className="cursor-pointer" onClick={() => router.push(`/project/${project.id}/notebook`)}>
+                <CardContent className="cursor-pointer" onClick={() => router.push(`/project/${project.id}`)}>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center text-sm text-gray-600">
                       <Calendar className="w-4 h-4 mr-2" />

@@ -180,3 +180,47 @@ export async function PUT(
     );
   }
 }
+
+// DELETE - Delete a project
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const user = await getUserFromToken(request);
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { id: projectId } = await params;
+
+    // Verify project belongs to user
+    const projectCheck = await query(
+      `SELECT p.id FROM projects p
+       WHERE p.id = $1 AND p.user_id = $2`,
+      [projectId, user.id]
+    );
+
+    if (projectCheck.rows.length === 0) {
+      return NextResponse.json({ error: 'Project not found' }, { status: 404 });
+    }
+
+    // Delete the project (cascading deletes will handle related data)
+    await query(
+      'DELETE FROM projects WHERE id = $1',
+      [projectId]
+    );
+
+    return NextResponse.json({ 
+      success: true,
+      message: 'Project deleted successfully' 
+    });
+
+  } catch (error) {
+    console.error('Error deleting project:', error);
+    return NextResponse.json(
+      { error: 'Failed to delete project' },
+      { status: 500 }
+    );
+  }
+}
