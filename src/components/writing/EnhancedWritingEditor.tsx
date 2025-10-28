@@ -260,11 +260,15 @@ if (suggestion.type === 'add-analysis') {
   };
 
   const handleViewEvidence = (cellId: string) => {
-    // TODO: Scroll to and highlight the evidence in notebook
-    console.log('View evidence from cell:', cellId);
-    alert(`Evidence viewing will open the notebook and highlight cell: ${cellId}`);
+    // Dispatch custom event to highlight and scroll to the cell in notebook
+    const event = new CustomEvent('highlight-section', {
+      detail: { sectionId: cellId },
+      bubbles: true,
+    });
+    window.dispatchEvent(event);
+    
+    console.log('✨ Highlighting cell in notebook:', cellId);
   };
-
 
 
   return (

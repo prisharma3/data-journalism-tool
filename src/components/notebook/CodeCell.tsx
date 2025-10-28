@@ -42,6 +42,12 @@ interface CodeCellProps {
   viewMode: 'code' | 'text';
   onToggleViewMode: () => void;
   cellInsights: any[];
+  // ADD THESE NEW PROPS FOR TEXT VIEW
+  insights?: any[];
+  tags?: any[];
+  onUpdateInsight?: (insightId: string, content: string, tagId: string, hypothesisTags?: string[]) => void;
+  onDeleteInsight?: (insightId: string) => void;
+  onAddTag?: (name: string, color: string) => string;
 }
 
 export default function CodeCell({
@@ -433,68 +439,175 @@ export default function CodeCell({
   </>
 ) : (
   <>
-    {/* Text View: Show Insights Inline */}
+    {/* Text View: Show Insights with Full Editing */}
     <div className="p-4 space-y-3">
+      {/* Add Insight Button at Top */}
+      {onAddInsight && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onAddInsight(cell.id);
+          }}
+          className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-blue-500 text-white rounded text-sm hover:bg-blue-600 transition-colors shadow-sm"
+        >
+          <Plus size={16} />
+          Add New Insight
+        </button>
+      )}
+
+      {/* Insights List */}
       {cellInsights && cellInsights.length > 0 ? (
-        cellInsights.map((insight) => (
-          <div
-            key={insight.id}
-            className="p-3 bg-blue-50 border border-blue-200 rounded-lg"
-          >
-            <div className="flex items-start justify-between mb-2">
-              <span className="text-xs font-medium text-blue-700">
-                Insight
-              </span>
-            </div>
-            <p className="text-sm text-gray-800 whitespace-pre-wrap">
-              {insight.content}
-            </p>
-            {insight.hypothesisTags && insight.hypothesisTags.length > 0 && hypotheses && (
-              <div className="mt-2 flex flex-wrap gap-1">
-                {insight.hypothesisTags.map((tagId) => {
-                  const hyp = hypotheses.find(h => h.id === tagId);
-                  return hyp ? (
-                    <span
-                      key={tagId}
-                      className="px-2 py-0.5 text-xs rounded bg-purple-100 text-purple-700"
-                    >
-                      {hyp.content}
-                    </span>
-                  ) : null;
-                })}
-              </div>
-            )}
-          </div>
-        ))
-      ) : (
-        <div className="text-center py-8 text-gray-400">
-          <p className="text-sm">No insights for this cell yet</p>
-          {onAddInsight && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onAddInsight(cell.id);
-              }}
-              className="mt-2 text-xs text-blue-600 hover:text-blue-700"
+        cellInsights.map((insight) => {
+          const tag = tags?.find(t => t.id === insight.tagId);
+          
+          return (
+            <div
+              key={insight.id}
+              className="p-4 bg-white border-2 border-gray-200 rounded-lg hover:shadow-md transition-all"
             >
-              + Add Insight
-            </button>
-          )}
+              {/* Header with Tag and Actions */}
+              <div className="flex items-start justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  {tag && (
+                    <span 
+                      className="px-3 py-1 text-xs font-medium rounded-full text-white"
+                      style={{ backgroundColor: tag.color }}
+                    >
+                      {tag.name}
+                    </span>
+                  )}
+                </div>
+                
+                {/* Action Buttons */}
+                <div className="flex items-center gap-1">
+                  {onUpdateInsight && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        // TODO: Open edit modal or inline edit
+                        const newContent = prompt('Edit insight:', insight.content);
+                        if (newContent && newContent.trim()) {
+                          onUpdateInsight(insight.id, newContent.trim(), insight.tagId, insight.hypothesisTags);
+                        }
+                      }}
+                      className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
+                      title="Edit"
+                    >
+                      <Edit2 size={14} />
+                    </button>
+                  )}
+                  {onDeleteInsight && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (window.confirm('Delete this insight?')) {
+                          onDeleteInsight(insight.id);
+                        }
+                      }}
+                      className="p-1 text-gray-400 hover:text-red-600 transition-colors"
+                      title="Delete"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Insight Content */}
+              <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">
+                {insight.content}
+              </p>
+
+              {/* Hypothesis Tags */}
+              {insight.hypothesisTags && insight.hypothesisTags.length > 0 && hypotheses && (
+                <div className="mt-3 pt-3 border-t border-gray-200">
+                  <p className="text-xs text-gray-600 mb-2">Related to:</p>
+                  <div className="flex flex-wrap gap-1">
+                    {insight.hypothesisTags.map((tagId) => {
+                      const hyp = hypotheses.find(h => h.id === tagId);
+                      return hyp ? (
+                        <span
+                          key={tagId}
+                          className="px-2 py-1 text-xs rounded bg-purple-100 text-purple-800 border border-purple-200"
+                        >
+                          {hyp.content.substring(0, 50)}{hyp.content.length > 50 ? '...' : ''}
+                        </span>
+                      ) : null;
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Plot Thumbnail if exists */}
+              {insight.plotThumbnail && (
+                <div className="mt-3">
+                  <img
+                    src={insight.plotThumbnail}
+                    alt="Analysis plot"
+                    className="max-w-full h-32 object-contain rounded border border-gray-200"
+                  />
+                </div>
+              )}
+            </div>
+          );
+        })
+      ) : (
+        <div className="text-center py-12 text-gray-400 border-2 border-dashed border-gray-300 rounded-lg">
+          <p className="text-sm mb-2">No insights for this analysis yet</p>
+          <p className="text-xs text-gray-500">Add insights to document your findings</p>
         </div>
       )}
     </div>
     
-    {/* Show collapsed code preview in text view */}
+    {/* Show collapsed code and output preview in text view */}
     <details className="border-t border-gray-200 bg-gray-50">
-      <summary className="px-4 py-2 text-xs text-gray-600 cursor-pointer hover:bg-gray-100">
-        View Code
+      <summary className="px-4 py-2 text-xs text-gray-600 cursor-pointer hover:bg-gray-100 flex items-center gap-2">
+        <span>💻 View Code & Output</span>
+        {cell.output && <span className="text-green-600">✓ Executed</span>}
+        {cell.error && <span className="text-red-600">✗ Error</span>}
       </summary>
-      <pre className="px-4 py-2 text-xs text-gray-700 overflow-x-auto">
-        <code>{cell.content}</code>
-      </pre>
+      <div className="px-4 py-3 space-y-3">
+        {/* Code Preview */}
+        <div>
+          <p className="text-xs font-semibold text-gray-700 mb-1">Code:</p>
+          <pre className="text-xs text-gray-700 overflow-x-auto bg-white p-2 rounded border border-gray-200">
+            <code>{cell.content || 'No code'}</code>
+          </pre>
+        </div>
+        
+        {/* Output Preview */}
+        {cell.output && (
+          <div>
+            <p className="text-xs font-semibold text-gray-700 mb-1">Output:</p>
+            {cell.output.text && (
+              <pre className="text-xs text-gray-700 overflow-x-auto bg-white p-2 rounded border border-gray-200">
+                {cell.output.text}
+              </pre>
+            )}
+            {cell.output.plot && (
+              <img
+                src={cell.output.plot}
+                alt="Plot"
+                className="max-w-full h-auto rounded border border-gray-200 mt-2"
+              />
+            )}
+          </div>
+        )}
+        
+        {/* Error Display */}
+        {cell.error && (
+          <div>
+            <p className="text-xs font-semibold text-red-700 mb-1">Error:</p>
+            <pre className="text-xs text-red-700 overflow-x-auto bg-red-50 p-2 rounded border border-red-200">
+              {cell.error}
+            </pre>
+          </div>
+        )}
+      </div>
     </details>
   </>
 )}
+
     </div>
   );
 }

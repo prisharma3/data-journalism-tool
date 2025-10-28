@@ -225,53 +225,59 @@ const handleInsightClick = useCallback((insightId: string, cellId: string) => {
     }
   }, []);
 
-  // Generate minimap sections whenever notebook state changes
-  useEffect(() => {
-    if (!onSectionsChange) return;
-  
-    const sections: MinimapSection[] = [];
-    let currentPosition = 0;
-    const baseHeight = 0.05;
-  
-    // Dataset section
-    if (dataset) {
-      sections.push({
-        id: 'dataset',
-        type: 'dataset',
-        title: dataset.filename,
-        color: '#9E9E9E',
-        position: currentPosition,
-        height: baseHeight * 2,
-      });
-      currentPosition += baseHeight * 2;
-    }
-  
-    // Hypothesis sections
-    hypotheses.forEach((hyp, index) => {
-      sections.push({
-        id: hyp.id,
-        type: 'hypothesis',
-        title: `H${index + 1}: ${hyp.content.substring(0, 30)}...`,
-        color: '#9C27B0',
-        position: currentPosition,
-        height: baseHeight * 1.5,
-      });
-      currentPosition += baseHeight * 1.5;
+ // Generate minimap sections whenever notebook state changes
+useEffect(() => {
+  if (!onSectionsChange) return;
+
+  const sections: MinimapSection[] = [];
+  let currentPosition = 0;
+  const baseHeight = 0.05;
+
+  // Dataset section
+  if (dataset) {
+    sections.push({
+      id: 'dataset',
+      type: 'dataset',
+      title: dataset.filename,
+      color: '#9E9E9E',
+      position: currentPosition,
+      height: baseHeight * 2,
     });
-  
-    // Code cells and insights
-    cells.forEach((cell, index) => {
+    currentPosition += baseHeight * 2;
+  }
+
+  // Hypothesis sections
+  hypotheses.forEach((hyp, index) => {
+    sections.push({
+      id: hyp.id,
+      type: 'hypothesis',
+      title: `H${index + 1}: ${hyp.content.substring(0, 30)}...`,
+      color: '#9C27B0',
+      position: currentPosition,
+      height: baseHeight * 1.5,
+    });
+    currentPosition += baseHeight * 1.5;
+  });
+
+  // Code cells with view mode awareness
+  cells.forEach((cell, index) => {
+    const viewMode = getCellViewMode(cell.id);
+    const cellInsights = insights.filter(i => (i as LocalInsight).cellId === cell.id);
+    
+    // Different rendering based on view mode
+    if (viewMode === 'code') {
+      // CODE VIEW: Show cell + insights separately
       sections.push({
         id: cell.id,
         type: 'analysis',
         title: cell.query || `Cell ${index + 1}`,
-        color: '#2196F3',
+        color: '#2196F3', // Blue for code view
         position: currentPosition,
         height: baseHeight,
       });
       currentPosition += baseHeight;
-  
-      const cellInsights = insights.filter(i => (i as LocalInsight).cellId === cell.id);
+
+      // Show insights as separate sections in code view
       cellInsights.forEach(insight => {
         const tag = tags.find(t => t.id === insight.tagId);
         sections.push({
@@ -284,13 +290,28 @@ const handleInsightClick = useCallback((insightId: string, cellId: string) => {
         });
         currentPosition += baseHeight * 0.8;
       });
-    });
-  
-    console.log('Generated minimap sections:', sections);
-    if (onSectionsChange) {
-      onSectionsChange(sections);
+    } else {
+      // TEXT VIEW: Show as unified section with insights count
+      const insightCount = cellInsights.length;
+      sections.push({
+        id: cell.id,
+        type: 'insight', // Mark as insight type in text view
+        title: insightCount > 0 
+          ? `${insightCount} Insight${insightCount !== 1 ? 's' : ''}`
+          : 'No insights yet',
+        color: insightCount > 0 ? '#10B981' : '#94A3B8', // Green if has insights, gray if empty
+        position: currentPosition,
+        height: baseHeight * (1 + insightCount * 0.6), // Taller if more insights
+      });
+      currentPosition += baseHeight * (1 + insightCount * 0.6);
     }
-}, [dataset, hypotheses, cells, insights, tags, onSectionsChange]);
+  });
+
+  console.log('Generated minimap sections with view modes:', sections);
+  if (onSectionsChange) {
+    onSectionsChange(sections);
+  }
+}, [dataset, hypotheses, cells, insights, tags, onSectionsChange, getCellViewMode, globalViewMode, cellViewModes]);
 
 
   // Load cells from API or store
@@ -495,27 +516,22 @@ const executeCell = useCallback(async (cellId: string) => {
   }, [cells, setCells]);
 
   // Select cell
-  const selectCell = useCallback((cellId: string) => {
-    setSelectedCell(cellId);
+// Select cell
+const selectCell = useCallback((cellId: string) => {
+  setSelectedCell(cellId);
+  
+  // Scroll to the cell and highlight it
+  const cellElement = cellRefs.current.get(cellId);
+  if (cellElement) {
+    cellElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setHighlightedCellId(cellId);
     
-    // Find insights for this cell and scroll to them
-    const cellInsights = insights.filter(i => (i as LocalInsight).cellId === cellId);
-    if (cellInsights.length > 0 && insightsScrollRef.current) {
-      const firstInsight = cellInsights[0];
-      const insightElement = insightRefs.current.get(firstInsight.id);
-      
-      if (insightElement) {
-        insightElement.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        setHighlightedInsightId(firstInsight.id);
-        setHighlightedCellId(cellId);
-        
-        setTimeout(() => {
-          setHighlightedCellId(null);
-          setHighlightedInsightId(null);
-        }, 2000);
-      }
-    }
-  }, [insights, setSelectedCell]);
+    // Clear highlight after 2 seconds
+    setTimeout(() => {
+      setHighlightedCellId(null);
+    }, 2000);
+  }
+}, [setSelectedCell]);
 
 // Handle dataset upload
 const handleDatasetUpload = useCallback((filename: string, data: string, summary: any) => {
@@ -966,10 +982,8 @@ const handleSaveInsight = useCallback((content: string, tagId: string, hypothesi
 />
         </div>
       ))
-)}
-
-</div> {/* End of notebook scroll container */}
-
-</div> {/* End of main container */}
-  )
-}
+    )}
+    </div> 
+  </div>
+    );
+  }
