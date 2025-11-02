@@ -149,31 +149,9 @@ useEffect(() => {
 const [highlightedCellId, setHighlightedCellId] = useState<string | null>(null);
 const [highlightedInsightId, setHighlightedInsightId] = useState<string | null>(null);
 
-// NEW: View mode state
-const [globalViewMode, setGlobalViewMode] = useState<'code' | 'text'>('code');
-const [cellViewModes, setCellViewModes] = useState<Record<string, 'code' | 'text'>>({});
+// ADD THIS LINE:
+const [globalCodeCollapsed, setGlobalCodeCollapsed] = useState(false);
 
-// Helper to get effective view mode for a cell
-const getCellViewMode = (cellId: string): 'code' | 'text' => {
-  return cellViewModes[cellId] || globalViewMode;
-};
-
-// Toggle global view mode
-const toggleGlobalViewMode = () => {
-  const newMode = globalViewMode === 'code' ? 'text' : 'code';
-  setGlobalViewMode(newMode);
-  // Clear individual overrides when changing global mode
-  setCellViewModes({});
-};
-
-// Toggle individual cell view mode
-const toggleCellViewMode = (cellId: string) => {
-  setCellViewModes(prev => {
-    const currentMode = getCellViewMode(cellId);
-    const newMode = currentMode === 'code' ? 'text' : 'code';
-    return { ...prev, [cellId]: newMode };
-  });
-};
 
 // Refs to track DOM elements
 const cellRefs = useRef<Map<string, HTMLDivElement>>(new Map());
@@ -261,57 +239,25 @@ useEffect(() => {
 
   // Code cells with view mode awareness
   cells.forEach((cell, index) => {
-    const viewMode = getCellViewMode(cell.id);
     const cellInsights = insights.filter(i => (i as LocalInsight).cellId === cell.id);
+    const insightCount = cellInsights.length;
     
-    // Different rendering based on view mode
-    if (viewMode === 'code') {
-      // CODE VIEW: Show cell + insights separately
-      sections.push({
-        id: cell.id,
-        type: 'analysis',
-        title: cell.query || `Cell ${index + 1}`,
-        color: '#2196F3', // Blue for code view
-        position: currentPosition,
-        height: baseHeight,
-      });
-      currentPosition += baseHeight;
-
-      // Show insights as separate sections in code view
-      cellInsights.forEach(insight => {
-        const tag = tags.find(t => t.id === insight.tagId);
-        sections.push({
-          id: insight.id,
-          type: 'insight',
-          title: insight.content.substring(0, 30) + '...',
-          color: tag?.color || '#4CAF50',
-          position: currentPosition,
-          height: baseHeight * 0.8,
-        });
-        currentPosition += baseHeight * 0.8;
-      });
-    } else {
-      // TEXT VIEW: Show as unified section with insights count
-      const insightCount = cellInsights.length;
-      sections.push({
-        id: cell.id,
-        type: 'insight', // Mark as insight type in text view
-        title: insightCount > 0 
-          ? `${insightCount} Insight${insightCount !== 1 ? 's' : ''}`
-          : 'No insights yet',
-        color: insightCount > 0 ? '#10B981' : '#94A3B8', // Green if has insights, gray if empty
-        position: currentPosition,
-        height: baseHeight * (1 + insightCount * 0.6), // Taller if more insights
-      });
-      currentPosition += baseHeight * (1 + insightCount * 0.6);
-    }
+    sections.push({
+      id: cell.id,
+      type: 'analysis',
+      title: cell.query || `Cell ${index + 1}`,
+      color: insightCount > 0 ? '#10B981' : '#2196F3', // Green if has insights, blue otherwise
+      position: currentPosition,
+      height: baseHeight * (1 + insightCount * 0.3),
+    });
+    currentPosition += baseHeight * (1 + insightCount * 0.3);
   });
 
   console.log('Generated minimap sections with view modes:', sections);
   if (onSectionsChange) {
     onSectionsChange(sections);
   }
-}, [dataset, hypotheses, cells, insights, tags, onSectionsChange, getCellViewMode, globalViewMode, cellViewModes]);
+}, [dataset, hypotheses, cells, insights, tags, onSectionsChange]);
 
 
   // Load cells from API or store
@@ -770,32 +716,17 @@ const handleSaveInsight = useCallback((content: string, tagId: string, hypothesi
     Add Cell
   </Button>
 
-  {/* NEW: View Mode Toggle */}
-  <div className="ml-auto flex items-center gap-2">
-    <span className="text-xs text-gray-600">View:</span>
-    <div className="flex items-center bg-gray-100 rounded-md p-0.5">
-      <button
-        onClick={toggleGlobalViewMode}
-        className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
-          globalViewMode === 'code'
-            ? 'bg-white text-blue-600 shadow-sm'
-            : 'text-gray-600 hover:text-gray-900'
-        }`}
-      >
-        Code View
-      </button>
-      <button
-        onClick={toggleGlobalViewMode}
-        className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
-          globalViewMode === 'text'
-            ? 'bg-white text-blue-600 shadow-sm'
-            : 'text-gray-600 hover:text-gray-900'
-        }`}
-      >
-        Text View
-      </button>
-    </div>
-  </div>
+{/* Global Code Collapse Toggle */}
+<div className="ml-auto">
+  <Button
+    onClick={() => setGlobalCodeCollapsed(!globalCodeCollapsed)}
+    size="sm"
+    variant="outline"
+    className="flex items-center gap-1"
+  >
+    {globalCodeCollapsed ? '▶️' : '▼'} {globalCodeCollapsed ? 'Expand' : 'Collapse'} All Code
+  </Button>
+</div>
 </div>
 
 {/* Notebook Content - Full Width */}
@@ -976,8 +907,7 @@ const handleSaveInsight = useCallback((content: string, tagId: string, hypothesi
   canMoveUp={index > 0}
   canMoveDown={index < filteredCells.length - 1}
   datasetInfo={dataset?.summary}
-  viewMode={getCellViewMode(cell.id)}
-  onToggleViewMode={() => toggleCellViewMode(cell.id)}
+  isCodeCollapsed={globalCodeCollapsed}
   cellInsights={insights.filter(i => (i as LocalInsight).cellId === cell.id)}
 />
         </div>
