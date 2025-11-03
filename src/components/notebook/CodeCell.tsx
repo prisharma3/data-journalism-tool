@@ -86,12 +86,12 @@ export default function CodeCell({
 // Check for pending query from "Try" button
 useEffect(() => {
   const pendingQuery = sessionStorage.getItem('pendingQuery');
-  if (pendingQuery && !queryText) {
+  if (pendingQuery && !cell.query && !cell.content) {
     setQueryText(pendingQuery);
     setShowQueryInput(true);
     sessionStorage.removeItem('pendingQuery');
   }
-}, [queryText]);
+}, [cell.id, cell.query, cell.content]);
 
   const editorRef = useRef<any>(null);
 
@@ -134,7 +134,6 @@ const [showAIInsights, setShowAIInsights] = useState(false);
   };
 
   // Generate AI insights after execution
-// Generate AI insights after execution
 const handleGenerateInsights = async () => {
   if (!cell.output || cell.error) return;
   
@@ -263,8 +262,8 @@ useEffect(() => {
         </div>
       )}
   
-      {/* Query Input Mode */}
-      {showQueryInput && (
+   {/* Query Input Mode */}
+   {showQueryInput && (
         <div className="p-4 bg-gray-50 border-b border-gray-200">
           <div className="flex flex-col gap-2">
             <label className="text-xs font-medium text-gray-700">
@@ -305,6 +304,19 @@ useEffect(() => {
                   Cancel
                 </button>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Loading indicator for code generation - prominent display */}
+      {cell.isGenerating && (
+        <div className="p-6 bg-gradient-to-r from-purple-50 to-blue-50 border-b border-purple-200">
+          <div className="flex items-center justify-center gap-3">
+            <Loader size={24} className="animate-spin text-purple-600" />
+            <div className="flex flex-col">
+              <span className="text-sm font-semibold text-purple-700">Generating code...</span>
+              <span className="text-xs text-purple-600">AI is analyzing your query</span>
             </div>
           </div>
         </div>
@@ -477,7 +489,7 @@ useEffect(() => {
     </div>
     
     {/* Manual Add Insight Button */}
-    {cell.output && !cell.error && onAddInsight && (
+    {cell.output && !cell.error && onAddInsight && !isGeneratingInsights && (
       <button
         onClick={(e) => {
           e.stopPropagation();
@@ -491,8 +503,21 @@ useEffect(() => {
     )}
   </div>
 
+{/* Loading indicator for AI insights generation */}
+{isGeneratingInsights && (
+  <div className="mb-4 p-4 bg-gradient-to-r from-purple-50 to-blue-50 border-2 border-purple-200 rounded-lg">
+    <div className="flex items-center justify-center gap-3">
+      <Loader size={20} className="animate-spin text-purple-600" />
+      <div className="flex flex-col">
+        <span className="text-sm font-semibold text-purple-700">Generating AI insights...</span>
+        <span className="text-xs text-purple-600">Analyzing your results</span>
+      </div>
+    </div>
+  </div>
+)}
+
 {/* Show AI-Generated Insights if available and not generating */}
-{showAIInsights && aiGeneratedInsights.length > 0 && (
+{showAIInsights && aiGeneratedInsights.length > 0 && !isGeneratingInsights && (
     <div className="mb-4">
       {/* Header with bulk actions */}
       <div className="flex items-center justify-between mb-3">
@@ -504,19 +529,67 @@ useEffect(() => {
         
         {/* Bulk action buttons */}
         <div className="flex items-center gap-2">
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              // Accept all insights
-              aiGeneratedInsights.forEach((insight, idx) => {
-                handleAcceptInsight(insight, idx);
-              });
-            }}
-            className="text-xs px-3 py-1.5 bg-green-500 text-white rounded hover:bg-green-600 transition-all flex items-center gap-1.5 font-medium"
-          >
-            <Check size={14} />
-            Accept All
-          </button>
+        <button
+  onClick={(e) => {
+    e.stopPropagation();
+    if (!onAddInsight) return;
+    
+    // Combine all insights into one, separated by blank lines
+    const combinedContent = aiGeneratedInsights
+      .map(insight => insight.content)
+      .join('\n\n');
+    
+    // Find the most common suggested tag, or use the first one
+    const tagCounts: Record<string, number> = {};
+    aiGeneratedInsights.forEach(insight => {
+      if (insight.suggestedTag) {
+        tagCounts[insight.suggestedTag] = (tagCounts[insight.suggestedTag] || 0) + 1;
+      }
+    });
+    const mostCommonTag = Object.keys(tagCounts).sort((a, b) => tagCounts[b] - tagCounts[a])[0];
+    
+    // Find or create tag
+    let tagId = '';
+    if (mostCommonTag && onAddTag) {
+      const existingTag = tags?.find(t => t.name.toLowerCase() === mostCommonTag.toLowerCase());
+      if (existingTag) {
+        tagId = existingTag.id;
+      } else {
+        const colors = ['#4CAF50', '#2196F3', '#FF9800', '#9C27B0', '#F44336'];
+        const color = colors[tags?.length % colors.length || 0];
+        tagId = onAddTag(mostCommonTag, color);
+      }
+    } else if (tags && tags.length > 0) {
+      tagId = tags[0].id;
+    }
+    
+    // Collect all relevant hypotheses
+    const allRelevantHypotheses = Array.from(
+      new Set(
+        aiGeneratedInsights
+          .flatMap(insight => insight.relevantHypotheses || [])
+      )
+    );
+    
+    // Store combined insight for modal to pick up
+    sessionStorage.setItem('pendingInsight', JSON.stringify({
+      content: combinedContent,
+      tagId,
+      hypothesisTags: allRelevantHypotheses,
+    }));
+    
+    // Open the insight modal for editing
+    onAddInsight(cell.id);
+    
+    // Clear AI suggestions after opening modal
+    setAiGeneratedInsights([]);
+    setShowAIInsights(false);
+  }}
+  className="text-xs px-3 py-1.5 bg-green-500 text-white rounded hover:bg-green-600 transition-all flex items-center gap-1.5 font-medium"
+>
+  <Check size={14} />
+  Accept All
+</button>
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -526,7 +599,7 @@ useEffect(() => {
             className="text-xs px-3 py-1.5 bg-red-500 text-white rounded hover:bg-red-600 transition-all flex items-center gap-1.5 font-medium"
           >
             <X size={14} />
-            Delete All
+            Reject All
           </button>
         </div>
       </div>
@@ -588,42 +661,34 @@ useEffect(() => {
             </div>
             
             {/* Action buttons - at bottom */}
-            <div className="flex items-center justify-end gap-2 pt-3 border-t border-purple-200">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleAcceptInsight(aiInsight, index);
-                }}
-                className="p-1.5 bg-green-500 text-white rounded hover:bg-green-600 transition-all"
-                title="Accept insight"
-              >
-                <Check size={16} />
-              </button>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleEditInsight(aiInsight, index);
-                }}
-                className="p-1.5 bg-blue-500 text-white rounded hover:bg-blue-600 transition-all"
-                title="Edit insight"
-              >
-                <Edit2 size={16} />
-              </button>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  // Reject - just remove from list
-                  setAiGeneratedInsights(prev => prev.filter((_, i) => i !== index));
-                  if (aiGeneratedInsights.length === 1) {
-                    setShowAIInsights(false);
-                  }
-                }}
-                className="p-1.5 bg-red-500 text-white rounded hover:bg-red-600 transition-all"
-                title="Reject insight"
-              >
-                <X size={16} />
-              </button>
-            </div>
+<div className="flex items-center justify-end gap-2 pt-3 border-t border-purple-200">
+  <button
+    onClick={(e) => {
+      e.stopPropagation();
+      handleAcceptInsight(aiInsight, index);
+    }}
+    className="px-3 py-1.5 bg-green-500 text-white text-xs font-medium rounded hover:bg-green-600 transition-all flex items-center gap-1"
+    title="Accept and edit insight"
+  >
+    <Check size={14} />
+    Accept
+  </button>
+  <button
+    onClick={(e) => {
+      e.stopPropagation();
+      // Reject - just remove from list
+      setAiGeneratedInsights(prev => prev.filter((_, i) => i !== index));
+      if (aiGeneratedInsights.length === 1) {
+        setShowAIInsights(false);
+      }
+    }}
+    className="px-3 py-1.5 bg-red-500 text-white text-xs font-medium rounded hover:bg-red-600 transition-all flex items-center gap-1"
+    title="Reject insight"
+  >
+    <X size={14} />
+    Reject
+  </button>
+</div>
           </div>
         ))}
       </div>
@@ -632,37 +697,57 @@ useEffect(() => {
 
   {/* Existing Insights List */}
   {cellInsights && cellInsights.length > 0 ? (
-    cellInsights.map((insight) => {
-      const tag = tags?.find((t) => t.id === insight.tagId);
-      return (
-        <div
-          key={insight.id}
-          className="bg-white border rounded-lg p-3 shadow-sm hover:shadow-md transition-shadow mb-3"
-          style={{
-            borderLeftWidth: '3px',
-            borderLeftColor: tag?.color || '#4CAF50',
-          }}
-        >
-          <div className="flex items-start justify-between mb-2">
-            <span className="text-xs font-semibold" style={{ color: tag?.color || '#4CAF50' }}>
-              {tag?.name || 'INSIGHT'}
-            </span>
-            <div className="flex gap-1">
-              {onUpdateInsight && (
-                <button className="text-gray-400 hover:text-blue-600 text-xs p-1">
-                  ✏️
-                </button>
-              )}
-              {onDeleteInsight && (
-                <button
-                  onClick={() => onDeleteInsight(insight.id)}
-                  className="text-gray-400 hover:text-red-600 text-xs p-1"
-                >
-                  🗑️
-                </button>
-              )}
-            </div>
+   cellInsights.map((insight) => {
+    const tag = tags?.find((t) => t.id === insight.tagId);
+    return (
+      <div
+        key={insight.id}
+        className="bg-white border rounded-lg p-3 shadow-sm hover:shadow-md transition-shadow mb-3"
+        style={{
+          borderLeftWidth: '3px',
+          borderLeftColor: tag?.color || '#4CAF50',
+        }}
+      >
+        <div className="flex items-start justify-between mb-2">
+          <span className="text-xs font-semibold" style={{ color: tag?.color || '#4CAF50' }}>
+            {tag?.name || 'INSIGHT'}
+          </span>
+          <div className="flex gap-1">
+            {onUpdateInsight && onAddInsight && (
+              <button 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  // Store the insight data for editing
+                  sessionStorage.setItem('pendingInsight', JSON.stringify({
+                    content: insight.content,
+                    tagId: insight.tagId,
+                    hypothesisTags: insight.hypothesisTags || [],
+                    insightId: insight.id, // Store the ID so we know to update instead of create
+                  }));
+                  // Open the insight modal for editing
+                  onAddInsight(cell.id);
+                }}
+                className="text-gray-400 hover:text-blue-600 text-xs p-1"
+              >
+                ✏️
+              </button>
+            )}
+            {onDeleteInsight && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (window.confirm('Delete this insight?')) {
+                    onDeleteInsight(insight.id);
+                  }
+                }}
+                className="text-gray-400 hover:text-red-600 text-xs p-1"
+              >
+                🗑️
+              </button>
+            )}
           </div>
+        </div>
+
           
           <p className="text-sm text-gray-700 leading-relaxed mb-2">
             {insight.content}
@@ -685,7 +770,7 @@ useEffect(() => {
             </div>
           )}
 
-          {insight.plotThumbnail && (
+          {/* {insight.plotThumbnail && (
             <div className="mt-2">
               <img
                 src={insight.plotThumbnail}
@@ -693,7 +778,7 @@ useEffect(() => {
                 className="w-20 h-16 object-cover rounded border border-gray-200"
               />
             </div>
-          )}
+          )} */}
         </div>
       );
     })

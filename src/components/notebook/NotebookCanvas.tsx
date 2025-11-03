@@ -9,6 +9,7 @@ import HypothesisSection from './HypothesisSection';
 import AddInsightModal from './AddInsightModal';
 import { useRef } from 'react';
 import { Insight as GlobalInsight, Hypothesis as GlobalHypothesis, Tag as GlobalTag } from '@/types';
+import NotebookFilter from './NotebookFilter';
 
 interface NotebookCanvasProps {
     projectId: string;
@@ -155,18 +156,31 @@ const [isHypothesesCollapsed, setIsHypothesesCollapsed] = useState(false);
 
 // Filter state for notebook cells
 const [notebookHypothesisFilter, setNotebookHypothesisFilter] = useState<string[]>([]);
+const [notebookTagFilter, setNotebookTagFilter] = useState<string[]>([]);
 const [showNotebookFilter, setShowNotebookFilter] = useState(false);
 
-// Filter cells based on selected hypothesis filter
+// Filter cells based on selected hypothesis and tag filters
 const filteredCells = useMemo(() => {
-  if (notebookHypothesisFilter.length === 0) {
+  // If no filters applied, show all cells
+  if (notebookHypothesisFilter.length === 0 && notebookTagFilter.length === 0) {
     return cells;
   }
   
-  return cells.filter(cell => 
-    cell.hypothesisTags?.some((tag: string) => notebookHypothesisFilter.includes(tag))
-  );
-}, [cells, notebookHypothesisFilter]);
+  return cells.filter(cell => {
+    // Check hypothesis filter
+    const matchesHypothesis = notebookHypothesisFilter.length === 0 || 
+      cell.hypothesisTags?.some((tag: string) => notebookHypothesisFilter.includes(tag));
+    
+    // Check tag filter - cell must have at least one insight with a selected tag
+    const matchesTag = notebookTagFilter.length === 0 || 
+      insights.some((insight: LocalInsight) => 
+        insight.cellId === cell.id && notebookTagFilter.includes(insight.tagId)
+      );
+    
+    // Cell must match both filters (AND logic)
+    return matchesHypothesis && matchesTag;
+  });
+}, [cells, notebookHypothesisFilter, notebookTagFilter, insights]);
 
   // Add this helper function to scroll to a cell
 const scrollToCell = useCallback((cellId: string) => {
@@ -743,81 +757,20 @@ const handleSaveInsightFromModal = useCallback((content: string, tagId: string, 
   )}
 </div>
 
-{/* Hypothesis Filter for Notebook */}
-{hypotheses.length > 0 && (
-  <div className="mb-4 bg-white border border-gray-300 rounded-lg p-3">
-    <div className="flex items-center justify-between">
-      <h3 className="text-sm font-semibold text-gray-700">Filter Code Cells</h3>
-      <button
-        onClick={() => setShowNotebookFilter(!showNotebookFilter)}
-        className="text-xs px-2 py-1 bg-white border border-gray-300 rounded hover:bg-gray-50 flex items-center gap-1"
-      >
-        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-        </svg>
-        Filter by Hypothesis
-        {notebookHypothesisFilter.length > 0 && (
-          <span className="bg-purple-600 text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px]">
-            {notebookHypothesisFilter.length}
-          </span>
-        )}
-      </button>
-    </div>
-
-    {showNotebookFilter && (
-      <div className="mt-3 p-3 bg-gray-50 border border-gray-200 rounded relative">
-        {/* Close button */}
-        <button
-          onClick={() => setShowNotebookFilter(false)}
-          className="absolute top-2 right-2 text-gray-400 hover:text-gray-600"
-          title="Close filter"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
-
-        <p className="text-xs font-semibold text-gray-600 mb-2">Show cells linked to:</p>
-        <div className="space-y-1">
-          {hypotheses.map((hyp, index) => (
-            <label key={hyp.id} className="flex items-center gap-2 text-xs cursor-pointer hover:bg-white p-1 rounded">
-              <input
-                type="checkbox"
-                checked={notebookHypothesisFilter.includes(hyp.id)}
-                onChange={(e) => {
-                  if (e.target.checked) {
-                    setNotebookHypothesisFilter(prev => [...prev, hyp.id]);
-                  } else {
-                    setNotebookHypothesisFilter(prev => prev.filter(id => id !== hyp.id));
-                  }
-                }}
-                className="rounded"
-              />
-              <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium text-white bg-purple-600">
-                H{index + 1}
-              </span>
-              <span className="flex-1 truncate">{hyp.content.slice(0, 40)}...</span>
-            </label>
-          ))}
-        </div>
-
-        {notebookHypothesisFilter.length > 0 && (
-          <button
-            onClick={() => setNotebookHypothesisFilter([])}
-            className="mt-2 w-full text-xs px-2 py-1 bg-gray-200 hover:bg-gray-300 rounded"
-          >
-            Clear Filter
-          </button>
-        )}
-      </div>
-    )}
-
-    {notebookHypothesisFilter.length > 0 && (
-      <p className="text-xs text-gray-500 mt-2">
-        Showing {filteredCells.length} of {cells.length} code cells
-      </p>
-    )}
-  </div>
+{/* Notebook Filter - Shows after hypotheses, before first cell */}
+{(hypotheses.length > 0 || tags.length > 0) && (
+  <NotebookFilter
+    hypotheses={hypotheses}
+    tags={tags}
+    selectedHypotheses={notebookHypothesisFilter}
+    selectedTags={notebookTagFilter}
+    onHypothesesChange={setNotebookHypothesisFilter}
+    onTagsChange={setNotebookTagFilter}
+    onClearAll={() => {
+      setNotebookHypothesisFilter([]);
+      setNotebookTagFilter([]);
+    }}
+  />
 )}
 
 {cells.length === 0 ? (
