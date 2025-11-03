@@ -97,80 +97,79 @@ ${cell.output?.plot ? '\n[Contains visualization/plot]' : ''}
 
   return `You are a data analysis expert helping a researcher extract meaningful insights from their analysis results.
 
-${fullContext}
-
-Based on the analysis above, generate 1-3 high-quality insights that:
-1. Directly interpret the results in clear, accessible language
-2. Connect findings to the research hypotheses (if relevant)
-3. Highlight important patterns, trends, or statistical findings
-4. Suggest implications or next steps if appropriate
-
-For each insight, also determine:
-- A suggested category/tag: choose from "Key Finding", "Explanation", "For Review", "For Teacher", or suggest a new relevant category
-- Which hypothesis/hypotheses (if any) this insight relates to (provide the H number like "H1", "H2")
-- A confidence score (0.0 to 1.0) indicating how strongly the insight is supported by the data
-
-Return your response as a JSON array in this exact format:
-[
-  {
-    "content": "Clear, concise insight statement here",
-    "suggestedTag": "Key Finding",
-    "relevantHypotheses": ["H1"],
-    "confidence": 0.85
-  }
-]
-
-IMPORTANT: 
-- Each insight should be 1-3 sentences maximum
-- Focus on actionable, meaningful observations
-- Be specific and reference actual findings from the output
-- Return ONLY the JSON array, no additional text
-
-JSON Response:`;
+  ${fullContext}
+  
+  Based on the analysis above, generate 1-3 high-quality insights that:
+  1. Directly interpret the results in clear, accessible language
+  2. Connect findings to the research hypotheses (if relevant)
+  3. Highlight important patterns, trends, or statistical findings
+  4. Are actionable and meaningful for the research
+  
+  For EACH insight, also suggest ONE alternative or follow-up analysis that would provide additional context or validation.
+  
+  Return your response as a JSON array with this structure:
+  [
+    {
+      "content": "The main insight text here",
+      "suggestedTag": "pattern" or "trend" or "finding" or "correlation",
+      "relevantHypotheses": ["H1", "H2"],
+      "confidence": 0.85,
+      "alternativeAnalysis": "A natural language query for follow-up analysis (e.g., 'Show the correlation between age and income for different education levels')"
+    }
+  ]
+  
+  IMPORTANT for alternativeAnalysis:
+  - Make it a specific, actionable natural language query
+  - It should be ready to use for code generation
+  - Focus on validation, deeper exploration, or alternative perspectives
+  - Keep it concise but complete (one sentence)
+  
+  Return ONLY valid JSON, no other text.`;
 }
 
 function parseInsightsFromResponse(responseText: string, hypotheses?: any[]): any[] {
-  try {
-    // Extract JSON from response
-    const jsonMatch = responseText.match(/\[[\s\S]*\]/);
-    if (!jsonMatch) {
-      throw new Error('No valid JSON found in response');
-    }
-
-    const parsed = JSON.parse(jsonMatch[0]);
-    
-    if (!Array.isArray(parsed)) {
-      throw new Error('Response is not an array');
-    }
-
-    // Map hypothesis references to IDs
-    const insights = parsed.map((item: any) => {
-      const relevantHypotheses: string[] = [];
-      
-      if (item.relevantHypotheses && hypotheses) {
-        item.relevantHypotheses.forEach((ref: string) => {
-          const match = ref.match(/H(\d+)/i);
-          if (match) {
-            const index = parseInt(match[1]) - 1;
-            if (hypotheses[index]) {
-              relevantHypotheses.push(hypotheses[index].id);
-            }
-          }
-        });
+    try {
+      // Extract JSON from response
+      const jsonMatch = responseText.match(/\[[\s\S]*\]/);
+      if (!jsonMatch) {
+        throw new Error('No valid JSON found in response');
       }
-
-      return {
-        content: item.content || '',
-        suggestedTag: item.suggestedTag || 'For Review',
-        relevantHypotheses,
-        confidence: typeof item.confidence === 'number' ? item.confidence : 0.7,
-      };
-    });
-
-    return insights.filter((i: any) => i.content.trim().length > 0);
-
-  } catch (error) {
-    console.error('Error parsing insights:', error);
-    return [];
+  
+      const parsed = JSON.parse(jsonMatch[0]);
+      
+      if (!Array.isArray(parsed)) {
+        throw new Error('Response is not an array');
+      }
+  
+      // Map hypothesis references to IDs
+      const insights = parsed.map((item: any) => {
+        const relevantHypotheses: string[] = [];
+        
+        if (item.relevantHypotheses && hypotheses) {
+          item.relevantHypotheses.forEach((ref: string) => {
+            const match = ref.match(/H(\d+)/i);
+            if (match) {
+              const index = parseInt(match[1]) - 1;
+              if (hypotheses[index]) {
+                relevantHypotheses.push(hypotheses[index].id);
+              }
+            }
+          });
+        }
+  
+        return {
+          content: item.content || '',
+          suggestedTag: item.suggestedTag || 'For Review',
+          relevantHypotheses,
+          confidence: typeof item.confidence === 'number' ? item.confidence : 0.7,
+          alternativeAnalysis: item.alternativeAnalysis || null, // NEW: alternative analysis suggestion
+        };
+      });
+  
+      return insights.filter((i: any) => i.content.trim().length > 0);
+  
+    } catch (error) {
+      console.error('Error parsing insights:', error);
+      return [];
+    }
   }
-}

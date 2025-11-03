@@ -82,6 +82,17 @@ export default function CodeCell({
   const [isHovered, setIsHovered] = useState(false);
   const [showQueryInput, setShowQueryInput] = useState(!cell.content && !cell.query);
   const [queryText, setQueryText] = useState(cell.query || '');
+
+// Check for pending query from "Try" button
+useEffect(() => {
+  const pendingQuery = sessionStorage.getItem('pendingQuery');
+  if (pendingQuery && !queryText) {
+    setQueryText(pendingQuery);
+    setShowQueryInput(true);
+    sessionStorage.removeItem('pendingQuery');
+  }
+}, [queryText]);
+
   const editorRef = useRef<any>(null);
 
   const [isLocalCodeCollapsed, setIsLocalCodeCollapsed] = useState(false);
@@ -351,9 +362,20 @@ useEffect(() => {
           )}
         </div>
   
-        {/* Code Editor - Collapsible */}
-        {!shouldCollapseCode && cell.content && (
-          <div onKeyDown={handleKeyDown} className="border-t border-gray-200">
+{/* Code Editor - Collapsible */}
+{!shouldCollapseCode && cell.content && (
+          <div onKeyDown={handleKeyDown} className="border-t border-gray-200 relative">
+            {/* Loading overlay when generating code */}
+            {cell.isGenerating && (
+              <div className="absolute inset-0 bg-white/90 backdrop-blur-sm z-10 flex items-center justify-center">
+                <div className="flex flex-col items-center gap-3">
+                  <Loader className="animate-spin text-blue-600" size={32} />
+                  <div className="text-sm font-medium text-gray-700">Generating code...</div>
+                  <div className="text-xs text-gray-500">This may take a few seconds</div>
+                </div>
+              </div>
+            )}
+            
             <Editor
               height="150px"
               defaultLanguage="python"
@@ -469,113 +491,142 @@ useEffect(() => {
     )}
   </div>
 
-  {/* AI-Generated Insights Preview */}
-  {isGeneratingInsights && (
-    <div className="mb-4 p-4 bg-purple-50 border border-purple-200 rounded-lg">
-      <div className="flex items-center gap-2 text-purple-700">
-        <Loader size={16} className="animate-spin" />
-        <span className="text-sm font-medium">Generating insights...</span>
-      </div>
-    </div>
-  )}
-
-  {/* Show AI-Generated Insights if available and not generating */}
-  {showAIInsights && aiGeneratedInsights.length > 0 && (
-    <div className="mb-4 space-y-3">
-      <div className="flex items-center gap-2 mb-2">
-        <Sparkles size={14} className="text-purple-600" />
-        <span className="text-xs font-semibold text-purple-700">AI-Generated Insights</span>
-        <span className="text-xs text-gray-500">Review and accept</span>
+{/* Show AI-Generated Insights if available and not generating */}
+{showAIInsights && aiGeneratedInsights.length > 0 && (
+    <div className="mb-4">
+      {/* Header with bulk actions */}
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <Sparkles size={16} className="text-purple-600" />
+          <span className="text-sm font-semibold text-purple-700">AI-Generated Insights</span>
+          <span className="text-xs text-gray-500">({aiGeneratedInsights.length})</span>
+        </div>
+        
+        {/* Bulk action buttons */}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              // Accept all insights
+              aiGeneratedInsights.forEach((insight, idx) => {
+                handleAcceptInsight(insight, idx);
+              });
+            }}
+            className="text-xs px-3 py-1.5 bg-green-500 text-white rounded hover:bg-green-600 transition-all flex items-center gap-1.5 font-medium"
+          >
+            <Check size={14} />
+            Accept All
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setAiGeneratedInsights([]);
+              setShowAIInsights(false);
+            }}
+            className="text-xs px-3 py-1.5 bg-red-500 text-white rounded hover:bg-red-600 transition-all flex items-center gap-1.5 font-medium"
+          >
+            <X size={14} />
+            Delete All
+          </button>
+        </div>
       </div>
       
-      {aiGeneratedInsights.map((aiInsight, index) => (
-        <div
-          key={index}
-          className="bg-gradient-to-r from-purple-50 to-blue-50 border-2 border-purple-200 rounded-lg p-4"
-        >
-          <div className="flex items-start gap-3">
-            <Sparkles size={16} className="text-purple-600 mt-1 flex-shrink-0" />
-            <div className="flex-1">
-              <p className="text-sm text-gray-800 leading-relaxed mb-3">
+      {/* Card grid - 2 or 3 columns based on count */}
+      <div className={`grid gap-3 ${aiGeneratedInsights.length === 1 ? 'grid-cols-1' : aiGeneratedInsights.length === 2 ? 'grid-cols-2' : 'grid-cols-3'}`}>
+        {aiGeneratedInsights.map((aiInsight, index) => (
+          <div
+            key={index}
+            className="bg-gradient-to-br from-purple-50 to-blue-50 border-2 border-purple-200 rounded-lg p-4 flex flex-col"
+          >
+{/* Insight content */}
+<div className="flex-1 mb-3">
+              <p className="text-sm text-gray-800 leading-relaxed">
                 {aiInsight.content}
               </p>
               
+              {/* Tag suggestion */}
               {aiInsight.suggestedTag && (
-                <div className="mb-3">
-                  <span className="text-xs text-gray-600">Suggested category: </span>
-                  <span className="text-xs font-medium text-purple-700">
-                    {aiInsight.suggestedTag}
-                  </span>
+                <div className="mt-2 inline-flex items-center gap-1 text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded">
+                  <span className="font-medium">Tag:</span>
+                  <span>{aiInsight.suggestedTag}</span>
                 </div>
               )}
               
-              {aiInsight.relevantHypotheses && aiInsight.relevantHypotheses.length > 0 && (
-                <div className="flex gap-2 flex-wrap mb-3">
-                  {aiInsight.relevantHypotheses.map((hypId: string) => {
-                    const hyp = hypotheses?.find(h => h.id === hypId);
-                    const hypIndex = hypotheses?.findIndex(h => h.id === hypId);
-                    return hyp ? (
-                      <span
-                        key={hypId}
-                        className="text-[10px] px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full"
-                      >
-                        H{hypIndex !== undefined ? hypIndex + 1 : '?'}
-                      </span>
-                    ) : null;
-                  })}
+              {/* Alternative analysis suggestion */}
+              {aiInsight.alternativeAnalysis && (
+                <div className="mt-3 p-2 bg-amber-50 border border-amber-200 rounded">
+                  <div className="flex items-start gap-2">
+                    <div className="flex-1">
+                      <div className="text-xs font-medium text-amber-800 mb-1">
+                        💡 Further exploration:
+                      </div>
+                      <div className="text-xs text-amber-700 leading-relaxed">
+                        {aiInsight.alternativeAnalysis}
+                      </div>
+                    </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        // Add new cell below with pre-filled query
+                        if (onAddBelow) {
+                          onAddBelow(cell.id);
+                          // Pre-fill the query in the new cell
+                          setTimeout(() => {
+                            // Store the query for the new cell to pick up
+                            sessionStorage.setItem('pendingQuery', aiInsight.alternativeAnalysis);
+                          }, 100);
+                        }
+                      }}
+                      className="px-2 py-1 bg-amber-500 text-white text-xs font-medium rounded hover:bg-amber-600 transition-all whitespace-nowrap"
+                      title="Try this analysis"
+                    >
+                      Try
+                    </button>
+                  </div>
                 </div>
               )}
-              
+            </div>
+            
+            {/* Action buttons - at bottom */}
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-purple-200">
               <button
-  onClick={(e) => {
-    e.stopPropagation();
-    handleAcceptInsight(aiInsight, index);
-  }}
-  className="text-xs px-3 py-1.5 bg-green-600 text-white rounded hover:bg-green-700 flex items-center gap-1"
->
-  <Check size={12} />
-  Accept
-</button>
-
-<button
-  onClick={(e) => {
-    e.stopPropagation();
-    handleEditInsight(aiInsight, index);
-  }}
-  className="text-xs px-3 py-1.5 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center gap-1"
->
-  <Edit2 size={12} />
-  Edit
-</button>
-                
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    // Remove this insight from the list
-                    setAiGeneratedInsights(prev => prev.filter((_, i) => i !== index));
-                  }}
-                  className="text-xs px-3 py-1.5 bg-red-600 text-white rounded hover:bg-red-700 flex items-center gap-1"
-                >
-                  <X size={12} />
-                  Reject
-                </button>
-              </div>
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleAcceptInsight(aiInsight, index);
+                }}
+                className="p-1.5 bg-green-500 text-white rounded hover:bg-green-600 transition-all"
+                title="Accept insight"
+              >
+                <Check size={16} />
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleEditInsight(aiInsight, index);
+                }}
+                className="p-1.5 bg-blue-500 text-white rounded hover:bg-blue-600 transition-all"
+                title="Edit insight"
+              >
+                <Edit2 size={16} />
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  // Reject - just remove from list
+                  setAiGeneratedInsights(prev => prev.filter((_, i) => i !== index));
+                  if (aiGeneratedInsights.length === 1) {
+                    setShowAIInsights(false);
+                  }
+                }}
+                className="p-1.5 bg-red-500 text-white rounded hover:bg-red-600 transition-all"
+                title="Reject insight"
+              >
+                <X size={16} />
+              </button>
             </div>
           </div>
-        // </div>
-      ))}
-      
-      {/* Close AI Insights Panel */}
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          setShowAIInsights(false);
-          setAiGeneratedInsights([]);
-        }}
-        className="w-full text-xs py-2 text-gray-600 hover:bg-gray-100 rounded border border-gray-300"
-      >
-        Dismiss All
-      </button>
+        ))}
+      </div>
     </div>
   )}
 
