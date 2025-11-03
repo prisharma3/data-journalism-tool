@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import CodeCell from './CodeCell';
 import DatasetSection from './DatasetSection';
 import HypothesisSection from './HypothesisSection';
-import InsightCard from './InsightCard';
+import AddInsightModal from './AddInsightModal';
 import { useRef } from 'react';
 import { Insight as GlobalInsight, Hypothesis as GlobalHypothesis, Tag as GlobalTag } from '@/types';
 
@@ -136,14 +136,6 @@ useEffect(() => {
     ]);
   }
 }, [tags.length, setTags, projectId]);
-
-      const [insightModal, setInsightModal] = useState<{
-        isOpen: boolean;
-        cellId: string | null;
-      }>({
-        isOpen: false,
-        cellId: null,
-      });
 
 // Highlight and scroll state
 const [highlightedCellId, setHighlightedCellId] = useState<string | null>(null);
@@ -554,25 +546,6 @@ const handleGenerateCode = useCallback(async (cellId: string, query: string) => 
     updateCellInStore(cellId, { hypothesisTags: tags });
   }, [updateCellInStore]);
 
-// Handle adding insight
-const handleAddInsight = useCallback((cellId: string, content: string, tagId: string, hypothesisTags?: string[]) => {
-  const newInsight: LocalInsight = {
-    id: `insight-${Date.now()}`,
-    projectId,
-    analysisOutputId: '', // Will be set when linked to analysis output
-    tagId,
-    content,
-    position: insights.length,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    cellId,
-    hypothesisTags: hypothesisTags || [],
-  };
-
-  addInsightToStore(newInsight);
-}, [addInsightToStore, projectId, insights.length]);
-
-
   // Handle deleting insight
   const handleDeleteInsight = useCallback((insightId: string) => {
     removeInsightFromStore(insightId);
@@ -604,50 +577,38 @@ const handleUpdateInsight = useCallback((insightId: string, content: string, tag
     return newTag.id;
   }, [addTagToStore, projectId]);
 
-// Handle opening insight - create blank insight in edit mode in panel
-const handleOpenInsightModal = useCallback((cellId: string) => {
-  const cell = cells.find(c => c.id === cellId);
-  const plotThumbnail = cell?.output?.plot || undefined;
+// State for insight modal
+const [insightModalOpen, setInsightModalOpen] = useState(false);
+const [insightModalCellId, setInsightModalCellId] = useState<string | null>(null);
 
-  const newInsight: LocalInsight = {
-    id: `insight-${Date.now()}`,
-    projectId,
-    analysisOutputId: '', // Will be set when linked to analysis output
-    tagId: '', // Empty tagId means it's in "new/edit" mode
-    content: '',
-    position: insights.length,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    cellId,
-    hypothesisTags: [],
-    plotThumbnail,
-  };
-  
-  // Use the store action instead
-  addInsightToStore(newInsight);
-}, [cells, addInsightToStore, projectId, insights.length]);
-  
-  // Handle closing insight modal
-  const handleCloseInsightModal = useCallback(() => {
-    setInsightModal({ isOpen: false, cellId: null });
-  }, []);
+// Handle opening insight modal
+const handleOpenInsightModal = useCallback((cellId: string) => {
+  setInsightModalCellId(cellId);
+  setInsightModalOpen(true);
+}, []);
+
+// Handle closing insight modal
+const handleCloseInsightModal = useCallback(() => {
+  setInsightModalOpen(false);
+  setInsightModalCellId(null);
+}, []);
 
 // Handle saving insight from modal
-const handleSaveInsight = useCallback((content: string, tagId: string, hypothesisTags: string[]) => {
-  if (insightModal.cellId) {
-    const cell = cells.find(c => c.id === insightModal.cellId);
+const handleSaveInsightFromModal = useCallback((content: string, tagId: string, hypothesisTags: string[]) => {
+  if (insightModalCellId) {
+    const cell = cells.find(c => c.id === insightModalCellId);
     const plotThumbnail = cell?.output?.plot || undefined;
     
     const newInsight: LocalInsight = {
       id: `insight-${Date.now()}`,
       projectId,
-      analysisOutputId: '', // Will be set when linked to analysis output
+      analysisOutputId: '',
       tagId,
       content,
       position: insights.length,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-      cellId: insightModal.cellId,
+      cellId: insightModalCellId,
       hypothesisTags,
       plotThumbnail,
     };
@@ -655,7 +616,7 @@ const handleSaveInsight = useCallback((content: string, tagId: string, hypothesi
     addInsightToStore(newInsight);
     handleCloseInsightModal();
   }
-}, [insightModal.cellId, cells, addInsightToStore, handleCloseInsightModal, projectId, insights.length]);
+}, [insightModalCellId, cells, addInsightToStore, projectId, insights.length, handleCloseInsightModal]);
 
   // Listen for minimap section clicks
   useEffect(() => {
@@ -910,10 +871,25 @@ const handleSaveInsight = useCallback((content: string, tagId: string, hypothesi
   isCodeCollapsed={globalCodeCollapsed}
   cellInsights={insights.filter(i => (i as LocalInsight).cellId === cell.id)}
 />
-        </div>
+</div>
       ))
     )}
     </div> 
+    
+    {/* Add Insight Modal */}
+    <AddInsightModal
+      isOpen={insightModalOpen}
+      onClose={handleCloseInsightModal}
+      onSave={handleSaveInsightFromModal}
+      tags={tags}
+      hypotheses={hypotheses}
+      onAddTag={handleAddTag}
+      cellOutput={
+        insightModalCellId 
+          ? cells.find(c => c.id === insightModalCellId)?.output 
+          : undefined
+      }
+    />
   </div>
-    );
-  }
+);
+}

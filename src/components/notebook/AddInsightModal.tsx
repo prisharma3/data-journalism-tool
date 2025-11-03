@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import HypothesisTagSelector from './HypothesisTagSelector';
@@ -39,15 +39,40 @@ export default function AddInsightModal({
   hypotheses,
   onAddTag,
 }: AddInsightModalProps) {
-    const [content, setContent] = useState('');
-    const [selectedTagId, setSelectedTagId] = useState(tags[0]?.id || '');
-    const [showNewTagForm, setShowNewTagForm] = useState(false);
-    const [newTagName, setNewTagName] = useState('');
-    const [newTagColor, setNewTagColor] = useState(PRESET_COLORS[0]);   
-    const [selectedHypothesisTags, setSelectedHypothesisTags] = useState<string[]>([]);
-
-    const [isOutputCollapsed, setIsOutputCollapsed] = useState(false);
-const [isCellCollapsed, setIsCellCollapsed] = useState(false);
+  const [content, setContent] = useState('');
+  const [selectedTagId, setSelectedTagId] = useState(tags[0]?.id || '');
+  const [showNewTagForm, setShowNewTagForm] = useState(false);
+  const [newTagName, setNewTagName] = useState('');
+  const [newTagColor, setNewTagColor] = useState(PRESET_COLORS[0]);   
+  const [selectedHypothesisTags, setSelectedHypothesisTags] = useState<string[]>([]);
+  
+  const [isOutputCollapsed, setIsOutputCollapsed] = useState(false);
+  const [isCellCollapsed, setIsCellCollapsed] = useState(false);
+  
+  // Check for pending insight data from AI generation
+  useEffect(() => {
+    if (isOpen) {
+      const pendingData = sessionStorage.getItem('pendingInsight');
+      if (pendingData) {
+        try {
+          const parsed = JSON.parse(pendingData);
+          setContent(parsed.content || '');
+          setSelectedTagId(parsed.tagId || tags[0]?.id || '');
+          setSelectedHypothesisTags(parsed.hypothesisTags || []);
+          
+          // Clear the pending data
+          sessionStorage.removeItem('pendingInsight');
+        } catch (error) {
+          console.error('Failed to parse pending insight:', error);
+        }
+      }
+    } else {
+      // Reset form when modal closes
+      setContent('');
+      setSelectedTagId(tags[0]?.id || '');
+      setSelectedHypothesisTags([]);
+    }
+  }, [isOpen, tags]);
 
 
   if (!isOpen) return null;
