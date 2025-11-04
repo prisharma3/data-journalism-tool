@@ -62,10 +62,10 @@ export default function Minimap({ projectId, sections = [], onSectionClick }: Mi
     }
   };
 
-  // Group sections by type for better organization
-  const datasetSections = sections.filter(s => s.type === 'dataset');
-  const hypothesisSections = sections.filter(s => s.type === 'hypothesis');
-  const analysisSections = sections.filter(s => s.type === 'analysis');
+// Group sections by type for better organization
+const datasetSections = sections.filter(s => s.type === 'dataset');
+const hypothesisSections = sections.filter(s => s.type === 'hypothesis');
+const analysisSections = sections.filter(s => s.type === 'analysis');
 
   return (
     <div className="h-full flex flex-col bg-white">
@@ -202,62 +202,132 @@ export default function Minimap({ projectId, sections = [], onSectionClick }: Mi
               </div>
             )}
 
-            {/* Analysis/Cells Section */}
-            {analysisSections.length > 0 && (
+{/* Analysis/Cells Section */}
+{analysisSections.length > 0 && (
               <div className="mb-3">
                 <div className="px-3 py-1">
                   <div className="text-[9px] font-semibold text-gray-500 uppercase tracking-wider">
                     Analyses ({analysisSections.length})
                   </div>
                 </div>
-                {analysisSections.map((section, index) => (
-                  <button
-                    key={section.id}
-                    className={`w-full text-left px-3 py-2 transition-all flex items-start gap-2 group relative ${
-                      activeSection === section.id
-                        ? 'bg-green-50 border-l-2 border-green-500'
-                        : hoveredSection === section.id
-                        ? 'bg-gray-50'
-                        : 'hover:bg-gray-50'
-                    }`}
-                    onClick={() => handleSectionClick(section.id)}
-                    onMouseEnter={() => setHoveredSection(section.id)}
-                    onMouseLeave={() => setHoveredSection(null)}
-                    title={section.title}
-                  >
-                    {/* Left border indicator */}
-                    {activeSection !== section.id && (
-                      <div 
-                        className="absolute left-0 top-0 bottom-0 w-0.5 transition-all"
-                        style={{ 
-                          backgroundColor: section.color,
-                          opacity: hoveredSection === section.id ? 1 : 0.3
-                        }}
-                      />
-                    )}
-                    
-                    {/* Icon with number */}
-                    <div style={{ color: section.color }} className="flex items-center gap-1">
-                      {getSectionIcon(section.type)}
-                      <span className="text-[9px] font-medium">#{index + 1}</span>
-                    </div>
-                    
-                    {/* Content */}
-                    <div className="flex-1 min-w-0">
-                      <div className="text-[10px] font-medium text-gray-900 line-clamp-2">
-                        {section.title || `Analysis ${index + 1}`}
-                      </div>
-                    </div>
+                {analysisSections.map((section, index) => {
+                  // Find insights for this cell
+                  const cellInsights = sections.filter(
+                    s => s.type === 'insight' && (s as any).cellId === section.id
+                  );
+                  
+                  return (
+                    <div key={section.id}>
+                      {/* Analysis Cell */}
+                      <button
+                        className={`w-full text-left px-3 py-2 transition-all flex items-start gap-2 group relative ${
+                          activeSection === section.id
+                            ? 'bg-blue-50 border-l-2 border-blue-500'
+                            : hoveredSection === section.id
+                            ? 'bg-gray-50'
+                            : 'hover:bg-gray-50'
+                        }`}
+                        onClick={() => handleSectionClick(section.id)}
+                        onMouseEnter={() => setHoveredSection(section.id)}
+                        onMouseLeave={() => setHoveredSection(null)}
+                        title={section.title}
+                      >
+                        {/* Left border indicator */}
+                        {activeSection !== section.id && (
+                          <div 
+                            className="absolute left-0 top-0 bottom-0 w-0.5 transition-all"
+                            style={{ 
+                              backgroundColor: section.color,
+                              opacity: hoveredSection === section.id ? 1 : 0.3
+                            }}
+                          />
+                        )}
+                        
+                        {/* Icon with number */}
+                        <div style={{ color: section.color }} className="flex items-center gap-1">
+                          {getSectionIcon(section.type)}
+                          <span className="text-[9px] font-medium">#{index + 1}</span>
+                        </div>
+                        
+                        {/* Content */}
+                        <div className="flex-1 min-w-0">
+                          <div className="text-[10px] font-medium text-gray-900 line-clamp-2">
+                            {section.title || `Analysis ${index + 1}`}
+                          </div>
+                          {cellInsights.length > 0 && (
+                            <div className="text-[9px] text-gray-500 mt-0.5">
+                              {cellInsights.length} {cellInsights.length === 1 ? 'insight' : 'insights'}
+                            </div>
+                          )}
+                        </div>
 
-                    {/* Hover indicator */}
-                    {hoveredSection === section.id && (
-                      <div className="text-[9px] text-gray-400">→</div>
-                    )}
-                  </button>
-                ))}
+                        {/* Hover indicator */}
+                        {hoveredSection === section.id && (
+                          <div className="text-[9px] text-gray-400">→</div>
+                        )}
+                      </button>
+                      
+                      {/* Nested Insights */}
+                      {cellInsights.length > 0 && (
+                        <div className="ml-4 border-l border-gray-200">
+                          {cellInsights.map((insightSection, insightIndex) => (
+                            <button
+                              key={insightSection.id}
+                              className={`w-full text-left px-3 py-1.5 transition-all flex items-start gap-2 group relative ${
+                                activeSection === insightSection.id
+                                  ? 'bg-green-50 border-l-2 border-green-500'
+                                  : hoveredSection === insightSection.id
+                                  ? 'bg-gray-50'
+                                  : 'hover:bg-gray-50'
+                              }`}
+                              onClick={() => handleSectionClick(insightSection.id)}
+                              onMouseEnter={() => setHoveredSection(insightSection.id)}
+                              onMouseLeave={() => setHoveredSection(null)}
+                              title={insightSection.title}
+                            >
+                              {/* Left border indicator */}
+                              {activeSection !== insightSection.id && (
+                                <div 
+                                  className="absolute left-0 top-0 bottom-0 w-0.5 transition-all"
+                                  style={{ 
+                                    backgroundColor: insightSection.color,
+                                    opacity: hoveredSection === insightSection.id ? 1 : 0.3
+                                  }}
+                                />
+                              )}
+                              
+                              {/* Icon */}
+                              <div style={{ color: insightSection.color }} className="flex-shrink-0">
+                                {getSectionIcon(insightSection.type)}
+                              </div>
+                              
+                              {/* Content */}
+                              <div className="flex-1 min-w-0">
+                                <div className="text-[9px] font-medium text-gray-900 line-clamp-2">
+                                  {insightSection.title}
+                                </div>
+                                {(insightSection as any).tagName && (
+                                  <div className="text-[8px] text-gray-500 mt-0.5">
+                                    {(insightSection as any).tagName}
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Hover indicator */}
+                              {hoveredSection === insightSection.id && (
+                                <div className="text-[9px] text-gray-400">→</div>
+                              )}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
+          
         )}
       </div>
     </div>
