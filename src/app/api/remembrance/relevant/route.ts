@@ -18,38 +18,36 @@ export async function POST(request: NextRequest) {
       notebookContent 
     } = await request.json();
 
-    // Validation
-// Validation
 // Validation
 if (!text || typeof text !== 'string') {
-    console.error('Validation failed: text =', text);
-    return NextResponse.json(
-      { error: 'Text is required and must be a string' },
-      { status: 400 }
-    );
-  }
+  console.error('Validation failed: text =', text);
+  return NextResponse.json(
+    { error: 'Text is required and must be a string' },
+    { status: 400 }
+  );
+}
 
-  if (typeof cursorPosition !== 'number') {
-    console.error('Validation failed: cursorPosition =', cursorPosition);
-    return NextResponse.json(
-      { error: 'Cursor position is required and must be a number' },
-      { status: 400 }
-    );
-  }
+if (typeof cursorPosition !== 'number') {
+  console.error('Validation failed: cursorPosition =', cursorPosition);
+  return NextResponse.json(
+    { error: 'Cursor position is required and must be a number' },
+    { status: 400 }
+  );
+}
 
-  if (!notebookContent) {
-    console.error('Validation failed: notebookContent is missing');
-    return NextResponse.json(
-      { error: 'Notebook context is required' },
-      { status: 400 }
-    );
-  }
+if (!notebookContent) {
+  console.error('Validation failed: notebookContent is missing');
+  return NextResponse.json(
+    { error: 'Notebook context is required' },
+    { status: 400 }
+  );
+}
 
-  console.log('Remembrance agent request:', { 
-    textLength: text.length, 
-    cursorPosition, 
-    hasNotebook: !!notebookContent 
-  });
+console.log('Remembrance agent request:', { 
+  textLength: text.length, 
+  cursorPosition, 
+  hasNotebook: !!notebookContent
+});
 
     const startTime = Date.now();
 

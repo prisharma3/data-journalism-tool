@@ -16,8 +16,8 @@ export default function ProjectPage() {
   const projectId = params.id as string;
   
   // Panel widths
-  const [minimapWidth, setMinimapWidth] = useState(60);
-  const [writingWidth, setWritingWidth] = useState(400);
+  const [minimapWidth, setMinimapWidth] = useState(120);
+  const [writingWidth, setWritingWidth] = useState(700);
   const [isDraggingLeft, setIsDraggingLeft] = useState(false);
   const [isDraggingRight, setIsDraggingRight] = useState(false);
 

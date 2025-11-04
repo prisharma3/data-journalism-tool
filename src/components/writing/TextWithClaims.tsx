@@ -1,10 +1,10 @@
 /**
- * TEXT WITH CLAIMS COMPONENT - FIXED
- * Renders text with claim underlines - now supports editing
- * FIXED: removeChild error by preventing React DOM conflicts
+ * TEXT WITH CLAIMS COMPONENT 
+ * Renders text with claim underlines
+ *
  */
 
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { ClaimStructure, WritingSuggestion } from '@/types/writing';
 
 interface TextWithClaimsProps {
@@ -28,7 +28,7 @@ export function TextWithClaims({
 }: TextWithClaimsProps) {
   const editorRef = useRef<HTMLDivElement>(null);
   const isComposingRef = useRef(false);
-  const [isUpdating, setIsUpdating] = useState(false);
+  const lastRenderedTextRef = useRef(text);
 
   // Sort claims by position (earliest first)
   const sortedClaims = [...claims].sort((a, b) => a.position.from - b.position.from);
@@ -66,27 +66,24 @@ export function TextWithClaims({
     const claimSuggestions = suggestions.filter(s => s.claimId === claim.id);
     
     if (claimSuggestions.length === 0) {
-      return 'decoration-green-500 decoration-2 decoration-solid'; // No issues - solid green
+      return 'decoration-green-500 decoration-2 decoration-solid';
     }
   
-    // Get highest priority suggestion
     const topSuggestion = claimSuggestions.sort((a, b) => b.priority - a.priority)[0];
   
-    // Match colors to suggestion types
     if (topSuggestion.type === 'remove-claim') {
-      return 'decoration-red-500 decoration-wavy decoration-2'; // Red wavy
+      return 'decoration-red-500 decoration-wavy decoration-2';
     }
     if (topSuggestion.type === 'add-analysis') {
-      return 'decoration-blue-500 decoration-2 decoration-solid'; // Blue solid
+      return 'decoration-blue-500 decoration-2 decoration-solid';
     }
     if (topSuggestion.type === 'weaken-claim' || topSuggestion.type === 'add-qualifier') {
-      return 'decoration-yellow-500 decoration-2 decoration-solid'; // Yellow
+      return 'decoration-yellow-500 decoration-2 decoration-solid';
     }
     if (topSuggestion.type === 'add-caveat') {
-      return 'decoration-orange-500 decoration-2 decoration-solid'; // Orange
+      return 'decoration-orange-500 decoration-2 decoration-solid';
     }
     
-    // Fallback to severity
     if (topSuggestion.severity === 'critical') {
       return 'decoration-red-500 decoration-wavy decoration-2';
     }
@@ -106,63 +103,95 @@ export function TextWithClaims({
 
   // Handle content changes in editable mode
   const handleInput = () => {
-    if (!isEditable || !editorRef.current || !onContentChange || isUpdating) return;
+    if (!isEditable || !editorRef.current || !onContentChange || isComposingRef.current) return;
     
     const newText = editorRef.current.innerText;
+    
+    // Update tracking ref to prevent re-render loop
+    lastRenderedTextRef.current = newText;
+    
     const selection = window.getSelection();
     const cursorPos = selection?.anchorOffset || 0;
     
     onContentChange(newText, cursorPos);
   };
 
-// Update content when text prop changes (but preserve cursor) - FIXED
-useEffect(() => {
-  if (!isEditable || !editorRef.current || isComposingRef.current) return;
-  
-  // Don't update if user is actively typing
-  if (document.activeElement === editorRef.current) {
-    return;
-  }
-  
-  const currentText = editorRef.current.innerText;
-  if (currentText !== text && !isUpdating) {
-    // Prevent recursive updates
-    setIsUpdating(true);
+  // Only update DOM when text changes from external source (not from typing)
+  useEffect(() => {
+    if (!isEditable || !editorRef.current) return;
     
-    // Save cursor position
-    const selection = window.getSelection();
-    let cursorOffset = 0;
+    const currentText = editorRef.current.innerText;
     
-    if (selection && selection.rangeCount > 0) {
-      const range = selection.getRangeAt(0);
-      cursorOffset = range.startOffset;
-    }
-    
-    // Use setTimeout instead of requestAnimationFrame for stability
-    setTimeout(() => {
-      if (editorRef.current) {
-        try {
-          // Only restore cursor if there's a text node
-          const firstChild = editorRef.current.firstChild;
-          if (firstChild && firstChild.nodeType === Node.TEXT_NODE) {
+    // Only update if text changed externally (not from our own typing)
+    if (text !== currentText && text !== lastRenderedTextRef.current) {
+      lastRenderedTextRef.current = text;
+      
+      // Save cursor position
+      const selection = window.getSelection();
+      let cursorOffset = 0;
+      
+      if (selection && selection.rangeCount > 0) {
+        const range = selection.getRangeAt(0);
+        cursorOffset = range.startOffset;
+      }
+      
+      // Update the HTML
+      editorRef.current.innerHTML = segments.map((segment) => {
+        if (segment.claim) {
+          const isHighlighted = highlightedClaimId === segment.claim.id;
+          const underlineClass = getUnderlineClass(segment.claim);
+          const tooltip = getTooltip(segment.claim);
+          const highlightClass = isHighlighted ? 'bg-yellow-100 ring-2 ring-yellow-400' : '';
+          
+          return `<span data-claim-id="${segment.claim.id}" class="underline underline-offset-4 ${underlineClass} cursor-pointer hover:bg-gray-100 transition-colors ${highlightClass}" title="${tooltip.replace(/"/g, '&quot;')}">${segment.text}</span>`;
+        }
+        return segment.text;
+      }).join('');
+      
+      // Restore cursor
+      requestAnimationFrame(() => {
+        if (editorRef.current) {
+          try {
             const range = document.createRange();
             const sel = window.getSelection();
-            const offset = Math.min(cursorOffset, firstChild.textContent?.length || 0);
             
-            range.setStart(firstChild, offset);
-            range.collapse(true);
-            sel?.removeAllRanges();
-            sel?.addRange(range);
+            // Walk through text nodes to find cursor position
+            const walker = document.createTreeWalker(
+              editorRef.current,
+              NodeFilter.SHOW_TEXT,
+              null
+            );
+            
+            let currentOffset = 0;
+            let targetNode = null;
+            let targetOffset = 0;
+            
+            while (walker.nextNode()) {
+              const node = walker.currentNode;
+              const nodeLength = node.textContent?.length || 0;
+              
+              if (currentOffset + nodeLength >= cursorOffset) {
+                targetNode = node;
+                targetOffset = cursorOffset - currentOffset;
+                break;
+              }
+              
+              currentOffset += nodeLength;
+            }
+            
+            if (targetNode) {
+              range.setStart(targetNode, targetOffset);
+              range.collapse(true);
+              sel?.removeAllRanges();
+              sel?.addRange(range);
+            }
+          } catch (e) {
+            console.warn('Could not restore cursor:', e);
           }
-        } catch (e) {
-          // Silently ignore cursor restoration errors
-          console.warn('Could not restore cursor:', e);
         }
-      }
-      setIsUpdating(false);
-    }, 0);
-  }
-}, [text, isEditable, isUpdating]);
+      });
+    }
+  }, [text, segments, highlightedClaimId, isEditable]);
 
   // Composition event handlers for IME input
   const handleCompositionStart = () => {
@@ -209,31 +238,20 @@ useEffect(() => {
       onInput={handleInput}
       onCompositionStart={handleCompositionStart}
       onCompositionEnd={handleCompositionEnd}
+      onBlur={handleInput}
       className="prose max-w-none outline-none min-h-[200px] focus:outline-none"
       style={{ whiteSpace: 'pre-wrap' }}
-    >
-      {segments.map((segment, index) => {
-        if (segment.claim) {
-          const isHighlighted = highlightedClaimId === segment.claim.id;
-          return (
-            <span
-              key={`${segment.claim.id}-${index}`}
-              data-claim-id={segment.claim.id}
-              className={`underline underline-offset-4 ${getUnderlineClass(segment.claim)} cursor-pointer hover:bg-gray-100 transition-colors ${
-                isHighlighted ? 'bg-yellow-100 ring-2 ring-yellow-400' : ''
-              }`}
-              onClick={(e) => {
-                e.preventDefault();
-                onClaimClick(segment.claim!.id);
-              }}
-              title={getTooltip(segment.claim)}
-            >
-              {segment.text}
-            </span>
-          );
+      onClick={(e) => {
+        const target = e.target as HTMLElement;
+        const claimSpan = target.closest('[data-claim-id]');
+        if (claimSpan) {
+          const claimId = claimSpan.getAttribute('data-claim-id');
+          if (claimId) {
+            e.preventDefault();
+            onClaimClick(claimId);
+          }
         }
-        return <span key={`text-${index}`}>{segment.text}</span>;
-      })}
-    </div>
+      }}
+    />
   );
 }
