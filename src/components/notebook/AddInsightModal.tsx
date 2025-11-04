@@ -60,20 +60,39 @@ export default function AddInsightModal({
       if (pendingData) {
         try {
           const parsed = JSON.parse(pendingData);
-          setContent(parsed.content || '');
-          setSelectedTagId(parsed.tagId || tags[0]?.id || '');
-          setSelectedHypothesisTags(parsed.hypothesisTags || []);
           
-          // If there's an insightId, store it in editingInsightId for consistency
-          if (parsed.insightId) {
-            sessionStorage.setItem('editingInsightId', parsed.insightId);
+          // Only populate if this came from Accept/Accept All button
+          // Ignore if fromAcceptButton is false or undefined (means it's from Try button)
+          if (parsed.fromAcceptButton) {
+            setContent(parsed.content || '');
+            setSelectedTagId(parsed.tagId || tags[0]?.id || '');
+            setSelectedHypothesisTags(parsed.hypothesisTags || []);
+            
+            // If there's an insightId, store it in editingInsightId for consistency
+            if (parsed.insightId) {
+              sessionStorage.setItem('editingInsightId', parsed.insightId);
+            }
+          } else {
+            // If opened without Accept/Accept All (e.g., from Try button), reset to empty
+            setContent('');
+            setSelectedTagId(tags[0]?.id || '');
+            setSelectedHypothesisTags([]);
           }
           
           // DON'T clear the pending data here - we need it when saving
           // It will be cleared in handleSaveInsightFromModal after processing
         } catch (error) {
           console.error('Failed to parse pending insight:', error);
+          // Reset to empty on error
+          setContent('');
+          setSelectedTagId(tags[0]?.id || '');
+          setSelectedHypothesisTags([]);
         }
+      } else {
+        // Reset to empty if no pending data
+        setContent('');
+        setSelectedTagId(tags[0]?.id || '');
+        setSelectedHypothesisTags([]);
       }
     } else {
       // Reset form when modal closes
@@ -113,7 +132,23 @@ export default function AddInsightModal({
         <div className="flex items-center justify-between p-4 border-b border-gray-200">
           <h3 className="text-lg font-semibold text-gray-900">Add Insight</h3>
           <button
-            onClick={onClose}
+            onClick={() => {
+              // Clean up any pendingInsight data that wasn't from Accept button
+              const pendingData = sessionStorage.getItem('pendingInsight');
+              if (pendingData) {
+                try {
+                  const parsed = JSON.parse(pendingData);
+                  // Only keep pendingInsight if it's from Accept button
+                  if (!parsed.fromAcceptButton) {
+                    sessionStorage.removeItem('pendingInsight');
+                  }
+                } catch (e) {
+                  // If parsing fails, remove it
+                  sessionStorage.removeItem('pendingInsight');
+                }
+              }
+              onClose();
+            }}
             className="p-1 hover:bg-gray-100 rounded"
           >
             <X size={20} className="text-gray-600" />
@@ -270,10 +305,26 @@ export default function AddInsightModal({
 
         
 
-        {/* Footer */}
-        <div className="flex justify-end gap-2 p-4 border-t border-gray-200">
+{/* Footer */}
+<div className="flex justify-end gap-2 p-4 border-t border-gray-200">
           <Button
-            onClick={onClose}
+            onClick={() => {
+              // Clean up any pendingInsight data that wasn't from Accept button
+              const pendingData = sessionStorage.getItem('pendingInsight');
+              if (pendingData) {
+                try {
+                  const parsed = JSON.parse(pendingData);
+                  // Only keep pendingInsight if it's from Accept button
+                  if (!parsed.fromAcceptButton) {
+                    sessionStorage.removeItem('pendingInsight');
+                  }
+                } catch (e) {
+                  // If parsing fails, remove it
+                  sessionStorage.removeItem('pendingInsight');
+                }
+              }
+              onClose();
+            }}
             variant="outline"
           >
             Cancel

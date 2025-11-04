@@ -644,9 +644,16 @@ const handleSaveInsightFromModal = (content: string, tagId: string, hypothesisTa
   if (pendingData) {
     try {
       const parsed = JSON.parse(pendingData);
-      if (parsed.aiInsightIndex !== undefined) {
-        // This was from a single "Accept" - remove that specific AI insight
-        sessionStorage.setItem('removeAiInsight', parsed.aiInsightIndex.toString());
+      
+      // Only process removal if this came from Accept/Accept All button
+      if (parsed.fromAcceptButton) {
+        if (parsed.aiInsightIndex !== undefined) {
+          // This was from a single "Accept" - remove that specific AI insight
+          sessionStorage.setItem('removeAiInsight', JSON.stringify({
+            cellId: parsed.aiInsightCellId,
+            index: parsed.aiInsightIndex
+          }));
+        }
       }
     } catch (e) {
       console.error('Error parsing pending insight:', e);
@@ -656,10 +663,17 @@ const handleSaveInsightFromModal = (content: string, tagId: string, hypothesisTa
   
   // Check if this was from "Accept All"
   const acceptAllMode = sessionStorage.getItem('acceptAllMode');
-  if (acceptAllMode === 'true') {
-    // Clear all AI insights
-    sessionStorage.setItem('clearAllAiInsights', 'true');
-    sessionStorage.removeItem('acceptAllMode');
+  if (acceptAllMode) {
+    try {
+      const parsed = JSON.parse(acceptAllMode);
+      // Clear all AI insights for the specific cell
+      sessionStorage.setItem('clearAllAiInsights', JSON.stringify({
+        cellId: parsed.cellId
+      }));
+      sessionStorage.removeItem('acceptAllMode');
+    } catch (e) {
+      console.error('Error parsing acceptAllMode:', e);
+    }
   }
 
   handleCloseInsightModal();
