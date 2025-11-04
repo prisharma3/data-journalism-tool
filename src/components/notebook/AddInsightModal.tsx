@@ -69,8 +69,8 @@ export default function AddInsightModal({
             sessionStorage.setItem('editingInsightId', parsed.insightId);
           }
           
-          // Clear the pending data
-          sessionStorage.removeItem('pendingInsight');
+          // DON'T clear the pending data here - we need it when saving
+          // It will be cleared in handleSaveInsightFromModal after processing
         } catch (error) {
           console.error('Failed to parse pending insight:', error);
         }

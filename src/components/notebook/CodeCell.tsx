@@ -29,8 +29,8 @@ interface CodeCellProps {
   onDelete: (id: string) => void;
   onUpdate: (id: string, content: string) => void;
   onSelect: (id: string) => void;
-  onAddBelow: (id: string) => void;
-  onAddAbove: (id: string) => void;
+  onAddAbove: (id: string, customCellId?: string) => void;
+  onAddBelow: (id: string, customCellId?: string) => void;
   onMoveUp?: (id: string) => void;
   onMoveDown?: (id: string) => void;
   onGenerateCode?: (id: string, query: string) => void;
@@ -84,17 +84,17 @@ export default function CodeCell({
   const [queryText, setQueryText] = useState(cell.query || '');
 
 // Check for pending query from "Try" button
-// Check for pending query from "Try" button
 useEffect(() => {
-  const pendingQuery = sessionStorage.getItem('pendingQuery');
+  // Check for cell-specific pending query
+  const pendingQuery = sessionStorage.getItem(`pendingQuery-${cell.id}`);
   if (pendingQuery) {
     // Only apply if this cell is truly empty
     if (!cell.query && !cell.content) {
       setQueryText(pendingQuery);
       setShowQueryInput(true);
     }
-    // Always remove it to prevent it from being applied to wrong cells
-    sessionStorage.removeItem('pendingQuery');
+    // Remove this cell's pending query
+    sessionStorage.removeItem(`pendingQuery-${cell.id}`);
   }
   // eslint-disable-next-line react-hooks/exhaustive-deps
 }, [cell.id]); // Only run when cell.id changes (new cell created)
@@ -193,7 +193,7 @@ sessionStorage.setItem('pendingInsight', JSON.stringify({
   content: aiInsight.content,
   tagId,
   hypothesisTags: aiInsight.relevantHypotheses || [],
-  aiInsightIndex: index, // Track which AI insight this came from
+  aiInsightIndex: index,
   aiInsightCellId: cell.id, // Track which cell this came from
 }));
   
@@ -311,25 +311,32 @@ useEffect(() => {
     if (removeIndex !== null) {
       const index = parseInt(removeIndex);
       if (!isNaN(index)) {
+        console.log(`Removing AI insight at index ${index} for cell ${cell.id}`);
         setAiGeneratedInsights(prev => {
           const newInsights = prev.filter((_, i) => i !== index);
+          console.log(`Insights after removal:`, newInsights);
           // If no more insights after removal, hide the panel
           if (newInsights.length === 0) {
             setShowAIInsights(false);
           }
           return newInsights;
         });
+        // Clear the flag after processing
         sessionStorage.removeItem('removeAiInsight');
       }
     }
     
     const clearAll = sessionStorage.getItem('clearAllAiInsights');
     if (clearAll === 'true') {
+      console.log(`Clearing all AI insights for cell ${cell.id}`);
       setAiGeneratedInsights([]);
       setShowAIInsights(false);
       sessionStorage.removeItem('clearAllAiInsights');
     }
   };
+
+  // Check immediately on mount and when cell.id changes
+  checkForRemoval();
 
   // Set up an interval to check periodically
   const interval = setInterval(checkForRemoval, 100);
@@ -744,18 +751,15 @@ sessionStorage.setItem('acceptAllMode', 'true');
                     <button
   onClick={(e) => {
     e.stopPropagation();
-    // Store the query BEFORE adding the cell
-    if (aiInsight.alternativeAnalysis) {
-      // Clear any existing pendingQuery first
-      sessionStorage.removeItem('pendingQuery');
-      // Set new query with a small delay to ensure it's fresh
-      setTimeout(() => {
-        sessionStorage.setItem('pendingQuery', aiInsight.alternativeAnalysis);
-        // Add new cell below - it will pick up the pendingQuery
-        if (onAddBelow) {
-          onAddBelow(cell.id);
-        }
-      }, 10);
+    if (aiInsight.alternativeAnalysis && onAddBelow) {
+      // Generate a unique ID for the new cell that will be created
+      const newCellId = `cell-${Date.now()}`;
+      
+      // Store the query with the cell ID it's intended for
+      sessionStorage.setItem(`pendingQuery-${newCellId}`, aiInsight.alternativeAnalysis);
+      
+      // Add new cell below with the specific ID
+      onAddBelow(cell.id, newCellId);
     }
   }}
   className="px-2 py-1 bg-amber-500 text-white text-xs font-medium rounded hover:bg-amber-600 transition-all whitespace-nowrap"
@@ -903,26 +907,26 @@ sessionStorage.setItem('acceptAllMode', 'true');
       {/* Cell Management Toolbar - Bottom */}
       <div className="px-4 py-2 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
         <div className="flex gap-2">
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onAddAbove(cell.id);
-            }}
-            className="text-xs px-2 py-1 text-gray-600 hover:bg-gray-200 rounded"
-            title="Add Cell Above"
-          >
-            ⬆️ Add Above
-          </button>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onAddBelow(cell.id);
-            }}
-            className="text-xs px-2 py-1 text-gray-600 hover:bg-gray-200 rounded"
-            title="Add Cell Below"
-          >
-            ⬇️ Add Below
-          </button>
+        <button
+  onClick={(e) => {
+    e.stopPropagation();
+    onAddAbove(cell.id, undefined);
+  }}
+  className="text-xs px-2 py-1 text-gray-600 hover:bg-gray-200 rounded"
+  title="Add Cell Above"
+>
+  ⬆️ Add Above
+</button>
+<button
+  onClick={(e) => {
+    e.stopPropagation();
+    onAddBelow(cell.id, undefined);
+  }}
+  className="text-xs px-2 py-1 text-gray-600 hover:bg-gray-200 rounded"
+  title="Add Cell Below"
+>
+  ⬇️ Add Below
+</button>
         </div>
         
         <div className="flex gap-2">

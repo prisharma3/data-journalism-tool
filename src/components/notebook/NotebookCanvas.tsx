@@ -289,31 +289,31 @@ useEffect(() => {
   }, []);
 
   // Add new cell
-  const addCell = useCallback((afterCellId?: string, position?: 'above' | 'below') => {
-    const newCell: CodeCellType = {
-      id: `cell-${Date.now()}`,
-      type: 'code',
-      content: '',
-      output: undefined,
-      executionCount: undefined,
-    };
+const addCell = useCallback((afterCellId?: string, position?: 'above' | 'below', customCellId?: string) => {
+  const newCell: CodeCellType = {
+    id: customCellId || `cell-${Date.now()}`,
+    type: 'code',
+    content: '',
+    output: undefined,
+    executionCount: undefined,
+  };
 
-    let newCells = [...cells];
-    if (afterCellId) {
-      const index = newCells.findIndex(c => c.id === afterCellId);
-      if (index !== -1) {
-        const insertIndex = position === 'above' ? index : index + 1;
-        newCells.splice(insertIndex, 0, newCell);
-      } else {
-        newCells.push(newCell);
-      }
+  let newCells = [...cells];
+  if (afterCellId) {
+    const index = newCells.findIndex(c => c.id === afterCellId);
+    if (index !== -1) {
+      const insertIndex = position === 'above' ? index : index + 1;
+      newCells.splice(insertIndex, 0, newCell);
     } else {
       newCells.push(newCell);
     }
+  } else {
+    newCells.push(newCell);
+  }
 
-    setCells(newCells);
-    setSelectedCell(newCell.id);
-  }, [cells, setCells, setSelectedCell]);
+  setCells(newCells);
+  setSelectedCell(newCell.id);
+}, [cells, setCells, setSelectedCell]);
 
   // Delete cell
   const deleteCell = useCallback((cellId: string) => {
@@ -838,8 +838,8 @@ const handleSaveInsightFromModal = (content: string, tagId: string, hypothesisTa
   onDelete={deleteCell}
   onUpdate={updateCell}
   onSelect={selectCell}
-  onAddAbove={(id) => addCell(id, 'above')}
-  onAddBelow={(id) => addCell(id, 'below')}
+  onAddAbove={(id, customCellId) => addCell(id, 'above', customCellId)}
+  onAddBelow={(id, customCellId) => addCell(id, 'below', customCellId)}
   onMoveUp={(id) => moveCell(id, 'up')}
   onMoveDown={(id) => moveCell(id, 'down')}
   onGenerateCode={handleGenerateCode}
