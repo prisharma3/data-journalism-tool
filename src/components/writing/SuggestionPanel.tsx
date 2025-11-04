@@ -82,12 +82,12 @@ export function SuggestionPanel({
   };
 
   return (
-    <div className="w-80 border-l border-gray-200 bg-white flex flex-col" style={{ height: '100%' }}>
+    <div className="w-64 border-l border-gray-200 bg-white flex flex-col" style={{ height: '100%' }}>
       {/* Header */}
-      <div className="border-b border-gray-200 px-4 py-3">
-        <h2 className="text-sm font-semibold text-gray-900">
+      <div className="border-b border-gray-200 px-3 py-2.5 bg-gray-50">
+        <h3 className="text-xs font-medium text-gray-700">
           Issues ({suggestions.length})
-        </h2>
+        </h3>
       </div>
       
       {/* Content */}

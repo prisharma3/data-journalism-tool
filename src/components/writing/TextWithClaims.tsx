@@ -115,51 +115,54 @@ export function TextWithClaims({
     onContentChange(newText, cursorPos);
   };
 
-  // Update content when text prop changes (but preserve cursor)
-  useEffect(() => {
-    if (!isEditable || !editorRef.current) return;
+// Update content when text prop changes (but preserve cursor) - FIXED
+useEffect(() => {
+  if (!isEditable || !editorRef.current || isComposingRef.current) return;
+  
+  // Don't update if user is actively typing
+  if (document.activeElement === editorRef.current) {
+    return;
+  }
+  
+  const currentText = editorRef.current.innerText;
+  if (currentText !== text && !isUpdating) {
+    // Prevent recursive updates
+    setIsUpdating(true);
     
-    const currentText = editorRef.current.innerText;
-    if (currentText !== text) {
-      // Prevent recursive updates
-      setIsUpdating(true);
-      
-      // Save cursor position
-      const selection = window.getSelection();
-      let cursorOffset = 0;
-      
-      if (selection && selection.rangeCount > 0) {
-        const range = selection.getRangeAt(0);
-        cursorOffset = range.startOffset;
-      }
-      
-      // Update will happen via re-render
-      // The cursor restoration will happen after the render
-      
-      // Schedule cursor restoration after DOM update
-      requestAnimationFrame(() => {
-        if (editorRef.current) {
-          try {
-            const textNode = editorRef.current.firstChild;
-            if (textNode && textNode.nodeType === Node.TEXT_NODE) {
-              const range = document.createRange();
-              const sel = window.getSelection();
-              const offset = Math.min(cursorOffset, textNode.textContent?.length || 0);
-              
-              range.setStart(textNode, offset);
-              range.collapse(true);
-              sel?.removeAllRanges();
-              sel?.addRange(range);
-            }
-          } catch (e) {
-            // Ignore cursor restoration errors
-            console.warn('Could not restore cursor:', e);
-          }
-        }
-        setIsUpdating(false);
-      });
+    // Save cursor position
+    const selection = window.getSelection();
+    let cursorOffset = 0;
+    
+    if (selection && selection.rangeCount > 0) {
+      const range = selection.getRangeAt(0);
+      cursorOffset = range.startOffset;
     }
-  }, [text, isEditable]);
+    
+    // Use setTimeout instead of requestAnimationFrame for stability
+    setTimeout(() => {
+      if (editorRef.current) {
+        try {
+          // Only restore cursor if there's a text node
+          const firstChild = editorRef.current.firstChild;
+          if (firstChild && firstChild.nodeType === Node.TEXT_NODE) {
+            const range = document.createRange();
+            const sel = window.getSelection();
+            const offset = Math.min(cursorOffset, firstChild.textContent?.length || 0);
+            
+            range.setStart(firstChild, offset);
+            range.collapse(true);
+            sel?.removeAllRanges();
+            sel?.addRange(range);
+          }
+        } catch (e) {
+          // Silently ignore cursor restoration errors
+          console.warn('Could not restore cursor:', e);
+        }
+      }
+      setIsUpdating(false);
+    }, 0);
+  }
+}, [text, isEditable, isUpdating]);
 
   // Composition event handlers for IME input
   const handleCompositionStart = () => {

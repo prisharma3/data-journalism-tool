@@ -163,10 +163,13 @@ const handleContentChange = (newContent: string) => {
   // Main editor
   return (
     <div className="h-full flex flex-col bg-white">
-      {/* Header with word count */}
-      <div className="border-b border-gray-200 px-6 py-3 flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-gray-900">Writing</h2>
-        <div className="flex items-center gap-4 text-sm text-gray-600">
+{/* Header with word count */}
+<div className="px-3 py-5 border-b border-gray-200 flex-shrink-0 bg-white flex items-center justify-between">
+        <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wide">
+          Writing
+        </h3>
+
+        <div className="flex items-center gap-4 text-xs text-gray-600">
           <span>{wordCount} words</span>
           {hypotheses.length > 0 && (
             <span className="text-gray-400">|</span>
