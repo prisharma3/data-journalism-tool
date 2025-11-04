@@ -84,15 +84,17 @@ export default function CodeCell({
   const [queryText, setQueryText] = useState(cell.query || '');
 
 // Check for pending query from "Try" button
+// Check for pending query from "Try" button
 useEffect(() => {
-  // Only check for pending query if this is a truly empty cell (just created)
-  if (!cell.query && !cell.content) {
-    const pendingQuery = sessionStorage.getItem('pendingQuery');
-    if (pendingQuery) {
+  const pendingQuery = sessionStorage.getItem('pendingQuery');
+  if (pendingQuery) {
+    // Only apply if this cell is truly empty
+    if (!cell.query && !cell.content) {
       setQueryText(pendingQuery);
       setShowQueryInput(true);
-      sessionStorage.removeItem('pendingQuery');
     }
+    // Always remove it to prevent it from being applied to wrong cells
+    sessionStorage.removeItem('pendingQuery');
   }
   // eslint-disable-next-line react-hooks/exhaustive-deps
 }, [cell.id]); // Only run when cell.id changes (new cell created)
@@ -185,14 +187,15 @@ const handleAcceptInsight = (aiInsight: any, index: number) => {
     tagId = tags[0].id;
   }
   
-  // Store the accepted insight data for the modal to use
-  // Include the index so we know which insight to remove after successful save
-  sessionStorage.setItem('pendingInsight', JSON.stringify({
-    content: aiInsight.content,
-    tagId,
-    hypothesisTags: aiInsight.relevantHypotheses || [],
-    aiInsightIndex: index, // Track which AI insight this came from
-  }));
+// Store the accepted insight data for the modal to use
+// Include the index and cellId so we know which insight to remove after successful save
+sessionStorage.setItem('pendingInsight', JSON.stringify({
+  content: aiInsight.content,
+  tagId,
+  hypothesisTags: aiInsight.relevantHypotheses || [],
+  aiInsightIndex: index, // Track which AI insight this came from
+  aiInsightCellId: cell.id, // Track which cell this came from
+}));
   
   // Trigger add insight - the modal should pick up the pending data
   onAddInsight(cell.id);
@@ -238,29 +241,101 @@ useEffect(() => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
 }, [cell.output]); // Trigger when output changes
 
+// // Listen for AI insight removal after successful modal save
+// useEffect(() => {
+//   const checkForRemoval = () => {
+//     const removeData = sessionStorage.getItem('removeAiInsight');
+//     if (removeData !== null) {
+//       try {
+//         const { cellId, index } = JSON.parse(removeData);
+//         // Only remove if this is the correct cell
+//         if (cellId === cell.id) {
+//           setAiGeneratedInsights(prev => {
+//             const newInsights = prev.filter((_, i) => i !== index);
+//             // If no more insights after removal, hide the panel
+//             if (newInsights.length === 0) {
+//               setShowAIInsights(false);
+//             }
+//             return newInsights;
+//           });
+//           sessionStorage.removeItem('removeAiInsight');
+//         }
+//       } catch (e) {
+//         // Fallback for old format (just index)
+//         const index = parseInt(removeData);
+//         if (!isNaN(index)) {
+//           setAiGeneratedInsights(prev => {
+//             const newInsights = prev.filter((_, i) => i !== index);
+//             if (newInsights.length === 0) {
+//               setShowAIInsights(false);
+//             }
+//             return newInsights;
+//           });
+//           sessionStorage.removeItem('removeAiInsight');
+//         }
+//       }
+//     }
+    
+//     const clearAllData = sessionStorage.getItem('clearAllAiInsights');
+//     if (clearAllData !== null) {
+//       try {
+//         const { cellId } = JSON.parse(clearAllData);
+//         // Only clear if this is the correct cell
+//         if (cellId === cell.id) {
+//           setAiGeneratedInsights([]);
+//           setShowAIInsights(false);
+//           sessionStorage.removeItem('clearAllAiInsights');
+//         }
+//       } catch (e) {
+//         // Fallback - clear for any cell
+//         setAiGeneratedInsights([]);
+//         setShowAIInsights(false);
+//         sessionStorage.removeItem('clearAllAiInsights');
+//       }
+//     }
+//   };
+
+//   // Check immediately
+//   checkForRemoval();
+  
+//   // Set up an interval to check periodically
+//   const interval = setInterval(checkForRemoval, 100);
+  
+//   return () => clearInterval(interval);
+// }, [cell.id]); // Add cell.id as dependency
+
 // Listen for AI insight removal after successful modal save
 useEffect(() => {
-  const removeIndex = sessionStorage.getItem('removeAiInsight');
-  if (removeIndex !== null) {
-    const index = parseInt(removeIndex);
-    setAiGeneratedInsights(prev => {
-      const newInsights = prev.filter((_, i) => i !== index);
-      // If no more insights after removal, hide the panel
-      if (newInsights.length === 0) {
-        setShowAIInsights(false);
+  const checkForRemoval = () => {
+    const removeIndex = sessionStorage.getItem('removeAiInsight');
+    if (removeIndex !== null) {
+      const index = parseInt(removeIndex);
+      if (!isNaN(index)) {
+        setAiGeneratedInsights(prev => {
+          const newInsights = prev.filter((_, i) => i !== index);
+          // If no more insights after removal, hide the panel
+          if (newInsights.length === 0) {
+            setShowAIInsights(false);
+          }
+          return newInsights;
+        });
+        sessionStorage.removeItem('removeAiInsight');
       }
-      return newInsights;
-    });
-    sessionStorage.removeItem('removeAiInsight');
-  }
+    }
+    
+    const clearAll = sessionStorage.getItem('clearAllAiInsights');
+    if (clearAll === 'true') {
+      setAiGeneratedInsights([]);
+      setShowAIInsights(false);
+      sessionStorage.removeItem('clearAllAiInsights');
+    }
+  };
+
+  // Set up an interval to check periodically
+  const interval = setInterval(checkForRemoval, 100);
   
-  const clearAll = sessionStorage.getItem('clearAllAiInsights');
-  if (clearAll === 'true') {
-    setAiGeneratedInsights([]);
-    setShowAIInsights(false);
-    sessionStorage.removeItem('clearAllAiInsights');
-  }
-}, [aiGeneratedInsights.length]); // Re-run when insights change
+  return () => clearInterval(interval);
+}, [cell.id]);
 
   return (
     <div
@@ -614,8 +689,8 @@ onAddInsight(cell.id);
 // Mark that we're in "accept all" mode
 sessionStorage.setItem('acceptAllMode', 'true');
   }}
-  className="text-xs px-3 py-1.5 bg-green-500 text-white rounded hover:bg-green-600 transition-all flex items-center gap-1.5 font-medium"
->
+  className="text-xs px-3 py-1 border border-green-400 text-green-700 rounded hover:bg-green-50 transition-all flex items-center gap-1.5 font-medium"
+  >
   <Check size={14} />
   Accept All
 </button>
@@ -625,7 +700,7 @@ sessionStorage.setItem('acceptAllMode', 'true');
               setAiGeneratedInsights([]);
               setShowAIInsights(false);
             }}
-            className="text-xs px-3 py-1.5 bg-red-500 text-white rounded hover:bg-red-600 transition-all flex items-center gap-1.5 font-medium"
+            className="text-xs px-3 py-1 border border-red-400 text-red-700 rounded hover:bg-red-50 transition-all flex items-center gap-1.5 font-medium"
           >
             <X size={14} />
             Reject All
@@ -671,11 +746,16 @@ sessionStorage.setItem('acceptAllMode', 'true');
     e.stopPropagation();
     // Store the query BEFORE adding the cell
     if (aiInsight.alternativeAnalysis) {
-      sessionStorage.setItem('pendingQuery', aiInsight.alternativeAnalysis);
-      // Add new cell below - it will pick up the pendingQuery
-      if (onAddBelow) {
-        onAddBelow(cell.id);
-      }
+      // Clear any existing pendingQuery first
+      sessionStorage.removeItem('pendingQuery');
+      // Set new query with a small delay to ensure it's fresh
+      setTimeout(() => {
+        sessionStorage.setItem('pendingQuery', aiInsight.alternativeAnalysis);
+        // Add new cell below - it will pick up the pendingQuery
+        if (onAddBelow) {
+          onAddBelow(cell.id);
+        }
+      }, 10);
     }
   }}
   className="px-2 py-1 bg-amber-500 text-white text-xs font-medium rounded hover:bg-amber-600 transition-all whitespace-nowrap"
@@ -689,13 +769,13 @@ sessionStorage.setItem('acceptAllMode', 'true');
             </div>
             
             {/* Action buttons - at bottom */}
-<div className="flex items-center justify-end gap-2 pt-3 border-t border-purple-200">
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-purple-200">
   <button
     onClick={(e) => {
       e.stopPropagation();
       handleAcceptInsight(aiInsight, index);
     }}
-    className="px-3 py-1.5 bg-green-500 text-white text-xs font-medium rounded hover:bg-green-600 transition-all flex items-center gap-1"
+    className="px-3 py-1 border border-green-400 text-green-700 text-xs rounded hover:bg-green-50 transition-all flex items-center gap-1"
     title="Accept and edit insight"
   >
     <Check size={14} />
@@ -710,7 +790,7 @@ sessionStorage.setItem('acceptAllMode', 'true');
         setShowAIInsights(false);
       }
     }}
-    className="px-3 py-1.5 bg-red-500 text-white text-xs font-medium rounded hover:bg-red-600 transition-all flex items-center gap-1"
+    className="px-3 py-1 border border-red-400 text-red-700 text-xs rounded hover:bg-red-50 transition-all flex items-center gap-1"
     title="Reject insight"
   >
     <X size={14} />
