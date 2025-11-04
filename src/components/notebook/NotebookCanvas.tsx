@@ -608,29 +608,62 @@ const handleCloseInsightModal = useCallback(() => {
 }, []);
 
 // Handle saving insight from modal
-const handleSaveInsightFromModal = useCallback((content: string, tagId: string, hypothesisTags: string[]) => {
-  if (insightModalCellId) {
+const handleSaveInsightFromModal = (content: string, tagId: string, hypothesisTags: string[]) => {
+  if (!insightModalCellId) return;
+
+  // Check if we're editing an existing insight
+  const editingInsightId = sessionStorage.getItem('editingInsightId');
+  
+  if (editingInsightId) {
+    // UPDATE existing insight
+    updateInsightInStore(editingInsightId, {
+      content,
+      tagId,
+      hypothesisTags,
+    });
+    sessionStorage.removeItem('editingInsightId');
+  } else {
+    // CREATE new insight
     const cell = cells.find(c => c.id === insightModalCellId);
-    const plotThumbnail = cell?.output?.plot || undefined;
     
     const newInsight: LocalInsight = {
-      id: `insight-${Date.now()}`,
-      projectId,
-      analysisOutputId: '',
-      tagId,
+      id: crypto.randomUUID(),
       content,
-      position: insights.length,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      cellId: insightModalCellId,
+      tagId,
       hypothesisTags,
-      plotThumbnail,
+      createdAt: new Date(),
+      cellId: insightModalCellId,
+      plotThumbnail: cell?.output?.plot,
     };
-  
+
     addInsightToStore(newInsight);
-    handleCloseInsightModal();
   }
-}, [insightModalCellId, cells, addInsightToStore, projectId, insights.length, handleCloseInsightModal]);
+
+  // Check if this was from accepting an AI-generated insight
+  const pendingData = sessionStorage.getItem('pendingInsight');
+  if (pendingData) {
+    try {
+      const parsed = JSON.parse(pendingData);
+      if (parsed.aiInsightIndex !== undefined) {
+        // This was from a single "Accept" - remove that specific AI insight
+        sessionStorage.setItem('removeAiInsight', parsed.aiInsightIndex.toString());
+      }
+    } catch (e) {
+      console.error('Error parsing pending insight:', e);
+    }
+    sessionStorage.removeItem('pendingInsight');
+  }
+  
+  // Check if this was from "Accept All"
+  const acceptAllMode = sessionStorage.getItem('acceptAllMode');
+  if (acceptAllMode === 'true') {
+    // Clear all AI insights
+    sessionStorage.setItem('clearAllAiInsights', 'true');
+    sessionStorage.removeItem('acceptAllMode');
+  }
+
+  handleCloseInsightModal();
+};
 
   // Listen for minimap section clicks
   useEffect(() => {

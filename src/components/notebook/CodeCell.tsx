@@ -85,13 +85,16 @@ export default function CodeCell({
 
 // Check for pending query from "Try" button
 useEffect(() => {
-  const pendingQuery = sessionStorage.getItem('pendingQuery');
-  if (pendingQuery && !cell.query && !cell.content) {
-    setQueryText(pendingQuery);
-    setShowQueryInput(true);
-    sessionStorage.removeItem('pendingQuery');
+  // Only check for pending query if this is a truly empty cell (just created)
+  if (!cell.query && !cell.content && !queryText) {
+    const pendingQuery = sessionStorage.getItem('pendingQuery');
+    if (pendingQuery) {
+      setQueryText(pendingQuery);
+      setShowQueryInput(true);
+      sessionStorage.removeItem('pendingQuery');
+    }
   }
-}, [cell.id, cell.query, cell.content]);
+}, [cell.id, cell.query, cell.content, queryText]);
 
   const editorRef = useRef<any>(null);
 
@@ -143,9 +146,10 @@ const handleGenerateInsights = async () => {
   try {
     const insights = await generateInsightsForCell({
       cell,
-      dataset: datasetInfo, // Use datasetInfo from props
+      dataset: datasetInfo,
       hypotheses: hypotheses || [],
-      allCells: [], // Could pass context of other cells if available
+      allCells: [],
+      tags: tags || [], 
     });
     
     setAiGeneratedInsights(insights);
@@ -180,27 +184,20 @@ const handleAcceptInsight = (aiInsight: any, index: number) => {
     tagId = tags[0].id;
   }
   
-  // Create the insight
-  // Note: We'll need to modify the parent to handle this properly
-  // For now, we'll trigger the add insight modal with pre-filled data
-  
   // Store the accepted insight data for the modal to use
+  // Include the index so we know which insight to remove after successful save
   sessionStorage.setItem('pendingInsight', JSON.stringify({
     content: aiInsight.content,
     tagId,
     hypothesisTags: aiInsight.relevantHypotheses || [],
+    aiInsightIndex: index, // Track which AI insight this came from
   }));
   
   // Trigger add insight - the modal should pick up the pending data
   onAddInsight(cell.id);
   
-  // Remove this insight from AI suggestions
-  setAiGeneratedInsights(prev => prev.filter((_, i) => i !== index));
-  
-  // If no more AI insights, hide the panel
-  if (aiGeneratedInsights.length === 1) {
-    setShowAIInsights(false);
-  }
+  // DON'T remove the insight yet - wait for successful save
+  // The insight will be removed when the modal successfully saves
 };
 
 // Edit AI-generated insight
@@ -239,6 +236,28 @@ useEffect(() => {
   }
   // eslint-disable-next-line react-hooks/exhaustive-deps
 }, [cell.output]); // Trigger when output changes
+
+// Listen for AI insight removal after successful modal save
+useEffect(() => {
+  const removeIndex = sessionStorage.getItem('removeAiInsight');
+  if (removeIndex !== null) {
+    const index = parseInt(removeIndex);
+    setAiGeneratedInsights(prev => prev.filter((_, i) => i !== index));
+    sessionStorage.removeItem('removeAiInsight');
+    
+    // If no more insights, hide the panel
+    if (aiGeneratedInsights.length === 1) {
+      setShowAIInsights(false);
+    }
+  }
+  
+  const clearAll = sessionStorage.getItem('clearAllAiInsights');
+  if (clearAll === 'true') {
+    setAiGeneratedInsights([]);
+    setShowAIInsights(false);
+    sessionStorage.removeItem('clearAllAiInsights');
+  }
+}, [aiGeneratedInsights.length]); // Re-run when insights change
 
   return (
     <div
@@ -578,12 +597,19 @@ useEffect(() => {
       hypothesisTags: allRelevantHypotheses,
     }));
     
-    // Open the insight modal for editing
-    onAddInsight(cell.id);
+    // // Open the insight modal for editing
+    // onAddInsight(cell.id);
     
-    // Clear AI suggestions after opening modal
-    setAiGeneratedInsights([]);
-    setShowAIInsights(false);
+    // // Clear AI suggestions after opening modal
+    // setAiGeneratedInsights([]);
+    // setShowAIInsights(false);
+
+    // Open the insight modal for editing
+onAddInsight(cell.id);
+
+// DON'T clear AI suggestions yet - wait for successful save
+// Mark that we're in "accept all" mode
+sessionStorage.setItem('acceptAllMode', 'true');
   }}
   className="text-xs px-3 py-1.5 bg-green-500 text-white rounded hover:bg-green-600 transition-all flex items-center gap-1.5 font-medium"
 >
@@ -638,23 +664,22 @@ useEffect(() => {
                       </div>
                     </div>
                     <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        // Add new cell below with pre-filled query
-                        if (onAddBelow) {
-                          onAddBelow(cell.id);
-                          // Pre-fill the query in the new cell
-                          setTimeout(() => {
-                            // Store the query for the new cell to pick up
-                            sessionStorage.setItem('pendingQuery', aiInsight.alternativeAnalysis);
-                          }, 100);
-                        }
-                      }}
-                      className="px-2 py-1 bg-amber-500 text-white text-xs font-medium rounded hover:bg-amber-600 transition-all whitespace-nowrap"
-                      title="Try this analysis"
-                    >
-                      Try
-                    </button>
+  onClick={(e) => {
+    e.stopPropagation();
+    // Store the query BEFORE adding the cell
+    if (aiInsight.alternativeAnalysis) {
+      sessionStorage.setItem('pendingQuery', aiInsight.alternativeAnalysis);
+      // Add new cell below - it will pick up the pendingQuery
+      if (onAddBelow) {
+        onAddBelow(cell.id);
+      }
+    }
+  }}
+  className="px-2 py-1 bg-amber-500 text-white text-xs font-medium rounded hover:bg-amber-600 transition-all whitespace-nowrap"
+  title="Try this analysis"
+>
+  Try
+</button>
                   </div>
                 </div>
               )}

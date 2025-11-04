@@ -6,12 +6,12 @@
 import { CodeCellType, Dataset, Hypothesis } from '@/types/notebook';
 
 export interface InsightGenerationRequest {
-  cell: CodeCellType;
-  dataset?: Dataset | null;
-  hypotheses?: Hypothesis[];
-  allCells?: CodeCellType[];
-}
-
+    cell: CodeCellType;
+    dataset?: Dataset | null;
+    hypotheses?: Hypothesis[];
+    allCells?: CodeCellType[];
+    tags?: any[]; 
+  }
 export interface GeneratedInsight {
   content: string;
   suggestedTag?: string;
@@ -56,6 +56,7 @@ export async function generateInsightsForCell(
           query: c.query,
           output: c.output,
         })),
+        tags: request.tags || [],
       }),
     });
 

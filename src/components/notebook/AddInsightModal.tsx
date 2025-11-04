@@ -12,13 +12,17 @@ interface Tag {
 }
 
 interface AddInsightModalProps {
-    isOpen: boolean;
-    onClose: () => void;
-    onSave: (content: string, tagId: string, hypothesisTags: string[]) => void;
-    tags: Tag[];
-    hypotheses: Array<{ id: string; content: string; createdAt: Date }>;
-    onAddTag?: (name: string, color: string) => string;
-  }
+  isOpen: boolean;
+  onClose: () => void;
+  onSave: (content: string, tagId: string, hypothesisTags: string[]) => void;
+  tags: Tag[];
+  hypotheses: Array<{ id: string; content: string; createdAt: string }>;
+  onAddTag?: (name: string, color: string) => string;
+  cellOutput?: {
+    text?: string;
+    plot?: string;
+  };
+}
 
 const PRESET_COLORS = [
   '#9C27B0', // Purple
@@ -184,23 +188,39 @@ export default function AddInsightModal({
                 />
 
                 {/* Color Picker */}
-                <div>
-                  <p className="text-xs font-medium text-gray-700 mb-2">Choose Color</p>
-                  <div className="grid grid-cols-8 gap-2">
-                    {PRESET_COLORS.map(color => (
-                      <button
-                        key={color}
-                        onClick={() => setNewTagColor(color)}
-                        className="w-8 h-8 rounded border-2 transition-all"
-                        style={{
-                          backgroundColor: color,
-                          borderColor: newTagColor === color ? '#000' : color,
-                          transform: newTagColor === color ? 'scale(1.1)' : 'scale(1)',
-                        }}
-                      />
-                    ))}
-                  </div>
-                </div>
+<div>
+  <p className="text-xs font-medium text-gray-700 mb-2">Choose Color</p>
+  
+  {/* Preset Colors */}
+  <div className="grid grid-cols-8 gap-2 mb-3">
+    {PRESET_COLORS.map(color => (
+      <button
+        key={color}
+        type="button"
+        onClick={() => setNewTagColor(color)}
+        className="w-8 h-8 rounded border-2 transition-all hover:scale-110"
+        style={{
+          backgroundColor: color,
+          borderColor: newTagColor === color ? '#000' : '#ddd',
+          boxShadow: newTagColor === color ? '0 0 0 2px rgba(0,0,0,0.1)' : 'none',
+        }}
+        title={color}
+      />
+    ))}
+  </div>
+  
+  {/* Custom Color Picker */}
+  <div className="flex items-center gap-2 p-2 bg-gray-50 rounded">
+    <label className="text-xs font-medium text-gray-600">Custom:</label>
+    <input
+      type="color"
+      value={newTagColor}
+      onChange={(e) => setNewTagColor(e.target.value)}
+      className="w-12 h-8 rounded border border-gray-300 cursor-pointer"
+    />
+    <span className="text-xs text-gray-500 font-mono">{newTagColor}</span>
+  </div>
+</div>
 
                 {/* New Tag Actions */}
                 <div className="flex gap-2">

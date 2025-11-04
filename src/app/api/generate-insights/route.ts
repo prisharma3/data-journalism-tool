@@ -4,7 +4,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { cell, dataset, hypotheses, allCells } = body;
+    const { cell, dataset, hypotheses, allCells, tags } = body;
 
     // Check if we have output to analyze
     if (!cell.output || cell.error) {
@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Build the prompt
-    const prompt = buildInsightGenerationPrompt(cell, dataset, hypotheses, allCells);
+    const prompt = buildInsightGenerationPrompt(cell, dataset, hypotheses, allCells, tags);
 
     // Call Gemini API
     const genAI = new GoogleGenerativeAI(apiKey);
@@ -45,11 +45,12 @@ export async function POST(request: NextRequest) {
 }
 
 function buildInsightGenerationPrompt(
-  cell: any,
-  dataset?: any,
-  hypotheses?: any[],
-  allCells?: any[]
-): string {
+    cell: any,
+    dataset?: any,
+    hypotheses?: any[],
+    allCells?: any[],
+    tags?: any[]
+  ): string {
   const contextParts = [];
 
   // Dataset context
@@ -95,6 +96,11 @@ ${cell.output?.plot ? '\n[Contains visualization/plot]' : ''}
 
   const fullContext = contextParts.join('\n---\n');
 
+  // Add existing tags information
+  const existingTagsInfo = tags && tags.length > 0 
+    ? `\n\nEXISTING TAGS IN PROJECT:\n${tags.map((t: any) => `- ${t.name}`).join('\n')}\n\nIMPORTANT: First check if any existing tags are appropriate before suggesting a new tag. Only suggest a new tag if none of the existing tags fit well.`
+    : '';
+
   return `You are a data analysis expert helping a researcher extract meaningful insights from their analysis results.
 
   ${fullContext}
@@ -109,13 +115,13 @@ ${cell.output?.plot ? '\n[Contains visualization/plot]' : ''}
   
   Return your response as a JSON array with this structure:
   [
-    {
-      "content": "The main insight text here",
-      "suggestedTag": "pattern" or "trend" or "finding" or "correlation",
-      "relevantHypotheses": ["H1", "H2"],
-      "confidence": 0.85,
-      "alternativeAnalysis": "A natural language query for follow-up analysis (e.g., 'Show the correlation between age and income for different education levels')"
-    }
+{
+  "content": "The main insight text here",
+"suggestedTag": "Pattern" or "Trend" or "Finding" or "Correlation" (ALWAYS capitalize the first letter of tags),
+  "relevantHypotheses": ["H1", "H2"],
+  "confidence": 0.85,
+  "alternativeAnalysis": "A natural language query for follow-up analysis"
+}
   ]
   
   IMPORTANT for alternativeAnalysis:
@@ -159,10 +165,12 @@ function parseInsightsFromResponse(responseText: string, hypotheses?: any[]): an
   
         return {
           content: item.content || '',
-          suggestedTag: item.suggestedTag || 'For Review',
+          suggestedTag: item.suggestedTag 
+          ? item.suggestedTag.charAt(0).toUpperCase() + item.suggestedTag.slice(1).toLowerCase()
+          : 'For Review',
           relevantHypotheses,
           confidence: typeof item.confidence === 'number' ? item.confidence : 0.7,
-          alternativeAnalysis: item.alternativeAnalysis || null, // NEW: alternative analysis suggestion
+          alternativeAnalysis: item.alternativeAnalysis || null, 
         };
       });
   

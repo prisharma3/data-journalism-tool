@@ -60,7 +60,9 @@ const PRESET_COLORS = [
   // Auto-enter edit mode if no tagId (new insight)
   const [isEditing, setIsEditing] = useState(!insight.tagId || !insight.content);
   const [editContent, setEditContent] = useState(insight.content);
-  const [editTagId, setEditTagId] = useState(insight.tagId);
+  const [editTagIds, setEditTagIds] = useState<string[]>(
+    insight.tagId ? [insight.tagId] : []
+  ); // Changed to array
   const [editHypothesisTags, setEditHypothesisTags] = useState<string[]>(insight.hypothesisTags || []);
   
   // Tag creation state
@@ -76,35 +78,48 @@ const PRESET_COLORS = [
   }, [insight.tagId, insight.content]);
 
   const handleSave = () => {
-    if (editContent.trim() && editTagId) {
-      onUpdate(insight.id, editContent.trim(), editTagId, editHypothesisTags);
+    if (editContent.trim() && editTagIds.length > 0) {
+      // Use the first tag as the primary tag for backward compatibility
+      onUpdate(insight.id, editContent.trim(), editTagIds[0], editHypothesisTags);
       setIsEditing(false);
+      sessionStorage.removeItem('editingInsightId');
     }
   };
 
   const handleCancel = () => {
-    if (!insight.content) {
-      // If it's a new insight with no content, delete it
+    // Only delete if it's a NEW insight (no original content AND not saved yet)
+    // An insight is "new" if it was just created and never had content
+    const isNewUnsavedInsight = !insight.content && !insight.tagId;
+    
+    if (isNewUnsavedInsight) {
+      // This is a brand new insight that was never saved - delete it
       onDelete(insight.id);
     } else {
+      // This is an existing insight - just revert changes and exit edit mode
       setEditContent(insight.content);
-      setEditTagId(insight.tagId);
+      setEditTagIds(insight.tagId ? [insight.tagId] : []);
       setEditHypothesisTags(insight.hypothesisTags || []);
       setIsEditing(false);
+      // Clear the editing flag
+      sessionStorage.removeItem('editingInsightId');
     }
   };
 
   const handleAddNewTag = () => {
     if (newTagName.trim() && onAddTag) {
       const newTagId = onAddTag(newTagName.trim(), newTagColor);
-      setEditTagId(newTagId);
+      // Add to the selected tags array
+      setEditTagIds(prev => [...prev, newTagId]);
       setNewTagName('');
       setNewTagColor(PRESET_COLORS[0]);
       setShowAddTag(false);
     }
   };
 
-  const currentTag = tag || allTags.find(t => t.id === editTagId);
+  const currentTag = tag || allTags.find(t => t.id === insight.tagId);
+  const selectedTags = isEditing 
+    ? allTags.filter(t => editTagIds.includes(t.id))
+    : (tag ? [tag] : []);
   const borderColor = currentTag?.color || '#gray';
   const bgColor = currentTag?.color ? `${currentTag.color}15` : '#f3f4f6';
 
@@ -134,33 +149,14 @@ const PRESET_COLORS = [
           )}
           
           {isEditing ? (
-            <div className="flex-1">
-              <select
-                value={editTagId}
-                onChange={(e) => {
-                  if (e.target.value === 'add-new') {
-                    setShowAddTag(true);
-                  } else {
-                    setEditTagId(e.target.value);
-                  }
-                }}
-                className="w-full text-xs font-semibold px-2 py-1 rounded border border-gray-300 focus:outline-none focus:ring-2"
-                style={{ color: currentTag?.color || '#666' }}
-              >
-                <option value="">Select Tag...</option>
-                {allTags.map(t => (
-                  <option key={t.id} value={t.id}>
-                    {t.name}
-                  </option>
-                ))}
-                <option value="add-new">+ Add New Tag</option>
-              </select>
-            </div>
-          ) : (
-            <span className="text-xs font-semibold" style={{ color: currentTag?.color }}>
-              {currentTag?.name || 'No Tag'}
-            </span>
-          )}
+  <span className="text-xs font-semibold text-gray-600">
+    {editTagIds.length} tag{editTagIds.length !== 1 ? 's' : ''} selected
+  </span>
+) : (
+  <span className="text-xs font-semibold" style={{ color: currentTag?.color }}>
+    {currentTag?.name || 'No Tag'}
+  </span>
+)}
         </div>
 
         {/* Action Buttons */}
@@ -169,7 +165,7 @@ const PRESET_COLORS = [
             <>
               <button
                 onClick={handleSave}
-                disabled={!editContent.trim() || !editTagId}
+                disabled={!editContent.trim() || editTagIds.length === 0}
                 className="p-1 hover:bg-white/50 rounded disabled:opacity-50"
                 title="Save"
               >
@@ -186,7 +182,11 @@ const PRESET_COLORS = [
           ) : (
             <>
               <button
-                onClick={() => setIsEditing(true)}
+  onClick={() => {
+    // Store that we're editing this specific insight
+    sessionStorage.setItem('editingInsightId', insight.id);
+    setIsEditing(true);
+  }}
                 className="p-1 hover:bg-white/50 rounded"
                 title="Edit"
               >
@@ -265,6 +265,109 @@ const PRESET_COLORS = [
             >
               Cancel
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Multi-select Tag Selector - ONLY in edit mode */}
+      {isEditing && !showAddTag && (
+        <div className="mb-3">
+          <label className="block text-xs font-medium text-gray-700 mb-2">
+            Select Tags (multiple)
+          </label>
+          <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto p-2 bg-gray-50 rounded">
+            {allTags.map(t => {
+              const isSelected = editTagIds.includes(t.id);
+              return (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setEditTagIds(prev => 
+                      prev.includes(t.id)
+                        ? prev.filter(id => id !== t.id) // Remove if selected
+                        : [...prev, t.id] // Add if not selected
+                    );
+                  }}
+                  className="flex items-center gap-2 p-2 rounded border-2 transition-all hover:shadow-sm text-left"
+                  style={{
+                    borderColor: isSelected ? t.color : '#e5e7eb',
+                    backgroundColor: isSelected ? `${t.color}15` : 'white',
+                  }}
+                >
+                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                    <div
+                      className="w-3 h-3 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: t.color }}
+                    />
+                    <span className="text-xs font-medium text-gray-900 truncate">
+                      {t.name}
+                    </span>
+                  </div>
+                  {isSelected && (
+                    <svg className="w-4 h-4 text-green-600 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Add New Tag Button */}
+          {onAddTag && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowAddTag(true);
+              }}
+              className="w-full flex items-center justify-center gap-2 p-2 border-2 border-dashed border-gray-300 rounded hover:border-blue-500 hover:bg-blue-50 transition-all mt-2"
+            >
+              <Plus size={14} className="text-blue-600" />
+              <span className="text-xs font-medium text-blue-600">
+                Create New Tag
+              </span>
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Selected Tags Display with Delete Option - ONLY in edit mode */}
+      {isEditing && editTagIds.length > 0 && (
+        <div className="mb-3">
+          <label className="block text-xs font-medium text-gray-700 mb-2">
+            Selected Tags
+          </label>
+          <div className="flex flex-wrap gap-2">
+            {editTagIds.map(tagId => {
+              const tagObj = allTags.find(t => t.id === tagId);
+              if (!tagObj) return null;
+              return (
+                <div
+                  key={tagId}
+                  className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium"
+                  style={{
+                    backgroundColor: `${tagObj.color}20`,
+                    color: tagObj.color,
+                    border: `1px solid ${tagObj.color}`,
+                  }}
+                >
+                  <span>{tagObj.name}</span>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setEditTagIds(prev => prev.filter(id => id !== tagId));
+                    }}
+                    className="ml-1 hover:bg-black hover:bg-opacity-10 rounded-full p-0.5"
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
