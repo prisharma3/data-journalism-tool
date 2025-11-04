@@ -34,147 +34,149 @@ export function useClaimEvaluation({
 
   const lastTextRef = useRef<string>('');
 
-/**
-   * Detect claims in text
-   */
-const detectClaims = useCallback(async () => {
-  console.log('🔍 detectClaims called:', { 
-      enabled, 
-      textLength: text?.length, 
-      lastTextLength: lastTextRef.current?.length,
-      sameAsLast: text === lastTextRef.current 
-    });
-    
-    if (!enabled) {
-      console.log('❌ Detection disabled');
-      return;
-    }
-    
-    if (!text || text === lastTextRef.current) {
-      console.log('❌ No text or same text');
-      return;
-    }
-    
-    console.log('✅ Starting claim detection...');
-  
-  setIsDetecting(true);
-  setError(null);
-  lastTextRef.current = text;
-
-  try {
-      console.log('📡 POST /api/claims/detect');
-    const response = await fetch('/api/claims/detect', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        text,
-        projectId,
-        cursorPosition,
-        hypotheses: notebookContext.hypotheses,
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to detect claims');
-    }
-
-    const data = await response.json();
-    console.log('Claims detected:', data.claims.length); 
-    setClaims(data.claims);
-    
-    // Auto-evaluate claims
-    if (data.claims.length > 0) {
-      console.log('Starting evaluation...');
-    } else {
-      setSuggestions([]);
-    }
-  } catch (err: any) {
-    setError(err.message);
-    console.error('Claim detection error:', err);
-  } finally {
-    setIsDetecting(false);
-  }
-}, []); // Empty dependencies - function will use latest values via closure
-
-/**
+  /**
    * Evaluate detected claims
    */
-const evaluateClaims = useCallback(async (claimsToEvaluate: ClaimStructure[]) => {
-  console.log('🔬 Starting evaluation for', claimsToEvaluate.length, 'claims');
-  setIsEvaluating(true);
-  const allSuggestions: WritingSuggestion[] = [];
+  const evaluateClaims = useCallback(async (claimsToEvaluate: ClaimStructure[]) => {
+    console.log('🔬 Starting evaluation for', claimsToEvaluate.length, 'claims');
+    setIsEvaluating(true);
+    const allSuggestions: WritingSuggestion[] = [];
 
-  try {
-    // Evaluate each claim
-    for (const claim of claimsToEvaluate) {
-      console.log('📡 POST /api/claims/evaluate for claim:', claim.text.substring(0, 50));
+    try {
+      // Evaluate each claim
+      for (const claim of claimsToEvaluate) {
+        console.log('📡 POST /api/claims/evaluate for claim:', claim.text.substring(0, 50));
+        
+        const response = await fetch('/api/claims/evaluate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            claim,
+            notebookContext,
+          }),
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          console.log('✅ Evaluation response:', {
+            suggestions: data.suggestions?.length || 0,
+            issues: data.toulminDiagram?.issues?.length || 0
+          });
+          
+          if (data.suggestions && data.suggestions.length > 0) {
+            allSuggestions.push(...data.suggestions);
+          }
+        } else {
+          console.error('❌ Evaluation failed:', response.status, await response.text());
+        }
+      }
+
+      console.log('📊 Total suggestions collected:', allSuggestions.length);
+      setSuggestions(allSuggestions);
+    } catch (err: any) {
+      console.error('Claim evaluation error:', err);
+    } finally {
+      setIsEvaluating(false);
+    }
+  }, [notebookContext]);
+
+  /**
+   * Detect claims in text
+   */
+  const detectClaims = useCallback(async () => {
+    console.log('🔍 detectClaims called:', { 
+        enabled, 
+        textLength: text?.length, 
+        lastTextLength: lastTextRef.current?.length,
+        sameAsLast: text === lastTextRef.current 
+      });
       
-      const response = await fetch('/api/claims/evaluate', {
+      if (!enabled) {
+        console.log('❌ Detection disabled');
+        return;
+      }
+      
+      if (!text || text.trim().length === 0) {
+        console.log('❌ No text');
+        return;
+      }
+      
+      if (text === lastTextRef.current) {
+        console.log('❌ Same text as last');
+        return;
+      }
+      
+      console.log('✅ Starting claim detection...');
+    
+    setIsDetecting(true);
+    setError(null);
+    lastTextRef.current = text;
+
+    try {
+      console.log('📡 POST /api/claims/detect');
+      const response = await fetch('/api/claims/detect', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          claim,
-          notebookContext,
+          text,
+          projectId,
+          cursorPosition,
+          hypotheses: notebookContext.hypotheses,
         }),
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        console.log('✅ Evaluation response:', {
-          suggestions: data.suggestions?.length || 0,
-          issues: data.toulminDiagram?.issues?.length || 0
-        });
-        
-        if (data.suggestions && data.suggestions.length > 0) {
-          allSuggestions.push(...data.suggestions);
-        }
-      } else {
-        console.error('❌ Evaluation failed:', response.status, await response.text());
+      if (!response.ok) {
+        throw new Error('Failed to detect claims');
       }
+
+      const data = await response.json();
+      console.log('Claims detected:', data.claims.length); 
+      setClaims(data.claims);
+      
+      // Auto-evaluate claims after detection
+      if (data.claims.length > 0) {
+        evaluateClaims(data.claims);
+      }
+    } catch (err: any) {
+      console.error('Claim detection error:', err);
+      setError(err.message);
+    } finally {
+      setIsDetecting(false);
     }
+  }, [enabled, text, projectId, cursorPosition, notebookContext, evaluateClaims]);
 
-    console.log('📊 Total suggestions collected:', allSuggestions.length);
-    setSuggestions(allSuggestions);
-  } catch (err: any) {
-    console.error('Claim evaluation error:', err);
-  } finally {
-    setIsEvaluating(false);
-  }
-}, []); // Empty dependencies - will use latest notebookContext via closure
-
-
-/**
+  /**
    * Get relevant analyses (Remembrance Agent)
    */
-const getRelevantAnalyses = useCallback(async () => {
-  if (!enabled || !text) return;
+  const getRelevantAnalyses = useCallback(async () => {
+    if (!enabled || !text) return;
 
-  setIsLoadingRelevant(true);
+    setIsLoadingRelevant(true);
 
-  try {
-    const response = await fetch('/api/remembrance/relevant', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        text,
-        cursorPosition,
-        activeHypothesis,
-        notebookContent: notebookContext,
-      }),
-    });
+    try {
+      const response = await fetch('/api/remembrance/relevant', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text,
+          cursorPosition,
+          activeHypothesis,
+          notebookContent: notebookContext,
+        }),
+      });
 
-    if (!response.ok) {
-      throw new Error('Failed to get relevant analyses');
+      if (!response.ok) {
+        throw new Error('Failed to get relevant analyses');
+      }
+
+      const data = await response.json();
+      setRelevantAnalyses(data.relevantAnalyses);
+    } catch (err: any) {
+      console.error('Remembrance agent error:', err);
+    } finally {
+      setIsLoadingRelevant(false);
     }
-
-    const data = await response.json();
-    setRelevantAnalyses(data.relevantAnalyses);
-  } catch (err: any) {
-    console.error('Remembrance agent error:', err);
-  } finally {
-    setIsLoadingRelevant(false);
-  }
-}, []); // Empty dependencies
+  }, [enabled, text, cursorPosition, activeHypothesis, notebookContext]);
 
   /**
    * Generate claim modifications
@@ -235,56 +237,48 @@ const getRelevantAnalyses = useCallback(async () => {
     }
   }, [notebookContext]);
 
-// Trigger detection when text changes - FIXED to avoid infinite loops
-useEffect(() => {
-  if (!enabled || !text) {
-    if (text.length === 0) {
-      lastTextRef.current = '';
+  // Trigger detection when text changes
+  useEffect(() => {
+    if (!enabled || !text) {
+      if (text?.length === 0) {
+        lastTextRef.current = '';
+      }
+      return;
     }
-    return;
-  }
-  
-  // Only detect if text actually changed
-  if (text === lastTextRef.current) {
-    return;
-  }
-  
-  // Create a new debounced function for this effect
-  const debouncedDetect = debounce(() => {
-    detectClaims();
-  }, 2000);
-  
-  // Trigger debounced detection
-  debouncedDetect();
-  
-  // Cleanup
-  return () => {
-    debouncedDetect.cancel();
-  };
-}, [text, enabled, detectClaims]); // NOW it's safe to include detectClaims since it has stable reference
+    
+    // Only detect if text actually changed
+    if (text === lastTextRef.current) {
+      return;
+    }
+    
+    // Create a new debounced function for this effect
+    const debouncedDetect = debounce(() => {
+      detectClaims();
+    }, 2000);
+    
+    // Trigger debounced detection
+    debouncedDetect();
+    
+    // Cleanup
+    return () => {
+      debouncedDetect.cancel();
+    };
+  }, [text, enabled, detectClaims]);
 
-// Trigger remembrance agent when cursor moves - FIXED
-useEffect(() => {
-  if (!enabled || !text) return;
-  
-  const debouncedRelevant = debounce(() => {
-    getRelevantAnalyses();
-  }, 1500);
-  
-  debouncedRelevant();
-  
-  return () => {
-    debouncedRelevant.cancel();
-  };
-}, [cursorPosition, enabled, text, getRelevantAnalyses]); // NOW safe
-
-// Auto-evaluate claims when they are detected - FIXED
-useEffect(() => {
-  if (claims.length > 0 && enabled) {
-    console.log('🔬 Auto-evaluating', claims.length, 'claims');
-    evaluateClaims(claims);
-  }
-}, [claims.length, enabled, evaluateClaims]); // NOW safe
+  // Trigger remembrance agent when cursor moves
+  useEffect(() => {
+    if (!enabled || !text) return;
+    
+    const debouncedRelevant = debounce(() => {
+      getRelevantAnalyses();
+    }, 1500);
+    
+    debouncedRelevant();
+    
+    return () => {
+      debouncedRelevant.cancel();
+    };
+  }, [cursorPosition, enabled, text, getRelevantAnalyses]);
     
   return {
     // State

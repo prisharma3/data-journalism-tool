@@ -748,29 +748,7 @@ useEffect(() => {
       return;
     }
 
-// Check if it's an insight
-const clickedInsight = insights.find(i => i.id === sectionId);
-if (clickedInsight) {
-  const insightCellId = (clickedInsight as LocalInsight).cellId;
-  if (insightCellId) {
-    const cellElement = cellRefs.current.get(insightCellId);
-    if (cellElement && notebookScrollRef.current) {
-      cellElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      setHighlightedCellId(insightCellId);
-      setHighlightedInsightId(clickedInsight.id);
-      console.log('✅ Scrolled to insight in cell:', insightCellId);
-      
-      // Clear highlights after 2 seconds
-      setTimeout(() => {
-        setHighlightedCellId(null);
-        setHighlightedInsightId(null);
-      }, 2000);
-    }
-  }
-  return;
-}
-    
-    // Check if it's a cell
+    // Check if it's a cell first
     const cell = cells.find(c => c.id === sectionId);
     if (cell) {
       const cellElement = cellRefs.current.get(cell.id);
@@ -785,28 +763,36 @@ if (clickedInsight) {
 
     // Check if it's an insight
     const insight = insights.find(i => i.id === sectionId) as LocalInsight;
-    if (insight && insight.cellId) {
-      // Scroll to the parent cell
-      const cellElement = cellRefs.current.get(insight.cellId);
-      if (cellElement && notebookScrollRef.current) {
-        cellElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        setHighlightedCellId(insight.cellId);
-        setHighlightedInsightId(insight.id);
-        setTimeout(() => {
-          setHighlightedCellId(null);
-          setHighlightedInsightId(null);
-        }, 2000);
-        console.log('✅ Scrolled to cell with insight:', insight.id);
+    if (insight) {
+      console.log('📍 Found insight:', insight.id, 'cellId:', insight.cellId);
+      if (insight.cellId) {
+        const cellElement = cellRefs.current.get(insight.cellId);
+        if (cellElement && notebookScrollRef.current) {
+          cellElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          setHighlightedCellId(insight.cellId);
+          setHighlightedInsightId(insight.id);
+          setTimeout(() => {
+            setHighlightedCellId(null);
+            setHighlightedInsightId(null);
+          }, 2000);
+          console.log('✅ Scrolled to cell with insight:', insight.id);
+        } else {
+          console.log('⚠️ Cell element not found for cellId:', insight.cellId);
+        }
+      } else {
+        console.log('⚠️ Insight has no cellId:', insight.id);
       }
       return;
     }
     
     console.log('⚠️ Section not found:', sectionId);
-  };
+    console.log('Available insights:', insights.map(i => i.id));
+    console.log('Available cells:', cells.map(c => c.id));
+  };  // <-- THIS CLOSING BRACE WAS MISSING!
   
   window.addEventListener('minimap-section-click', handleMinimapClick as EventListener);
   return () => window.removeEventListener('minimap-section-click', handleMinimapClick as EventListener);
-}, [cells, hypotheses, notebookScrollRef, cellRefs, setHighlightedCellId]);
+}, [cells, hypotheses, insights, notebookScrollRef, cellRefs, setHighlightedCellId, setHighlightedInsightId]);
   
 
 return (
