@@ -51,36 +51,38 @@ export default function NotebookFilter({
   return (
     <div className="mb-4 bg-white border border-gray-200 rounded-lg shadow-sm">
       {/* Filter Header */}
+      <div className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-50 transition-colors rounded-lg">
+  <button
+    onClick={() => setIsOpen(!isOpen)}
+    className="flex-1 flex items-center gap-2 text-left"
+  >
+    <Filter size={16} className="text-gray-600" />
+    <span className="text-sm font-semibold text-gray-700">
+      Filter Cells
+    </span>
+    {activeFilterCount > 0 && (
+      <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded-full">
+        {activeFilterCount}
+      </span>
+    )}
+  </button>
+  <div className="flex items-center gap-2">
+    {activeFilterCount > 0 && (
       <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-50 transition-colors rounded-lg"
+        onClick={handleClearAll}
+        className="px-2 py-1 text-xs text-gray-600 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
       >
-        <div className="flex items-center gap-2">
-          <Filter size={16} className="text-gray-600" />
-          <span className="text-sm font-semibold text-gray-700">
-            Filter Cells
-          </span>
-          {activeFilterCount > 0 && (
-            <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded-full">
-              {activeFilterCount}
-            </span>
-          )}
-        </div>
-        <div className="flex items-center gap-2">
-          {activeFilterCount > 0 && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handleClearAll();
-              }}
-              className="px-2 py-1 text-xs text-gray-600 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
-            >
-              Clear All
-            </button>
-          )}
-          {isOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-        </div>
+        Clear All
       </button>
+    )}
+    <button
+      onClick={() => setIsOpen(!isOpen)}
+      className="p-1"
+    >
+      {isOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+    </button>
+  </div>
+</div>
 
       {/* Filter Content */}
       {isOpen && (

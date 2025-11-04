@@ -53,9 +53,9 @@ export default function AddInsightModal({
   const [isOutputCollapsed, setIsOutputCollapsed] = useState(false);
   const [isCellCollapsed, setIsCellCollapsed] = useState(false);
   
-  // Check for pending insight data from AI generation
   useEffect(() => {
     if (isOpen) {
+      // Check if there's pending data (from AI-generated insights or editing)
       const pendingData = sessionStorage.getItem('pendingInsight');
       if (pendingData) {
         try {
@@ -63,6 +63,11 @@ export default function AddInsightModal({
           setContent(parsed.content || '');
           setSelectedTagId(parsed.tagId || tags[0]?.id || '');
           setSelectedHypothesisTags(parsed.hypothesisTags || []);
+          
+          // If there's an insightId, store it in editingInsightId for consistency
+          if (parsed.insightId) {
+            sessionStorage.setItem('editingInsightId', parsed.insightId);
+          }
           
           // Clear the pending data
           sessionStorage.removeItem('pendingInsight');

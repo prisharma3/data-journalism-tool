@@ -86,7 +86,7 @@ export default function CodeCell({
 // Check for pending query from "Try" button
 useEffect(() => {
   // Only check for pending query if this is a truly empty cell (just created)
-  if (!cell.query && !cell.content && !queryText) {
+  if (!cell.query && !cell.content) {
     const pendingQuery = sessionStorage.getItem('pendingQuery');
     if (pendingQuery) {
       setQueryText(pendingQuery);
@@ -94,7 +94,8 @@ useEffect(() => {
       sessionStorage.removeItem('pendingQuery');
     }
   }
-}, [cell.id, cell.query, cell.content, queryText]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [cell.id]); // Only run when cell.id changes (new cell created)
 
   const editorRef = useRef<any>(null);
 
@@ -242,13 +243,15 @@ useEffect(() => {
   const removeIndex = sessionStorage.getItem('removeAiInsight');
   if (removeIndex !== null) {
     const index = parseInt(removeIndex);
-    setAiGeneratedInsights(prev => prev.filter((_, i) => i !== index));
+    setAiGeneratedInsights(prev => {
+      const newInsights = prev.filter((_, i) => i !== index);
+      // If no more insights after removal, hide the panel
+      if (newInsights.length === 0) {
+        setShowAIInsights(false);
+      }
+      return newInsights;
+    });
     sessionStorage.removeItem('removeAiInsight');
-    
-    // If no more insights, hide the panel
-    if (aiGeneratedInsights.length === 1) {
-      setShowAIInsights(false);
-    }
   }
   
   const clearAll = sessionStorage.getItem('clearAllAiInsights');
