@@ -809,10 +809,17 @@ if (clickedInsight) {
 }, [cells, hypotheses, notebookScrollRef, cellRefs, setHighlightedCellId]);
   
 
-  return (
-<div className="h-full flex flex-col bg-gray-50">
-{/* Notebook Toolbar */}
-<div className="flex items-center gap-2 p-2 bg-white border-b border-gray-200">
+return (
+  <div className="h-full flex flex-col bg-gray-50">
+  {/* Header*/}
+  <div className="px-3 py-5 border-b border-gray-200 flex-shrink-0 bg-white">
+    <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wide">
+      Notebook
+    </h3>
+  </div>
+
+  {/* Notebook Toolbar */}
+  <div className="flex items-center gap-2 p-2 bg-white border-b border-gray-200">
   <Button
     onClick={executeAllCells}
     disabled={isExecutingAll}

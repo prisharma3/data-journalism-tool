@@ -68,16 +68,23 @@ const hypothesisSections = sections.filter(s => s.type === 'hypothesis');
 const analysisSections = sections.filter(s => s.type === 'analysis');
 
   return (
-    <div className="h-full flex flex-col bg-white">
-      {/* Header */}
-      <div className="px-3 py-3 border-b border-gray-200 flex-shrink-0">
-        <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wide">
-          Navigation
-        </h3>
-        <p className="text-[10px] text-gray-500 mt-0.5">
-          {sections.length} {sections.length === 1 ? 'item' : 'items'}
-        </p>
-      </div>
+    // <div className="h-full flex flex-col bg-white">
+    //   {/* Header */}
+    //   <div className="px-3 py-3 border-b border-gray-200 flex-shrink-0">
+    //     <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wide">
+    //       Navigation
+    //     </h3>
+    //     <p className="text-[10px] text-gray-500 mt-0.5">
+    //       {sections.length} {sections.length === 1 ? 'item' : 'items'}
+    //     </p>
+    //   </div>
+    <div className="h-full flex flex-col bg-gray-50">
+    {/* Header*/}
+    <div className="px-3 py-5 border-b border-gray-200 flex-shrink-0 bg-white">
+      <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wide">
+      Navigation
+      </h3>
+    </div>
 
       {/* Scrollable Section List */}
       <div className="flex-1 overflow-y-auto">

@@ -161,7 +161,7 @@ export default function WritingEditor({ projectId, initialContent = '' }: Writin
             <h2 className="text-lg font-semibold text-gray-900">Writing</h2>
             <WritingStats editor={editor} />
           </div>
-          
+
           {/* Save status */}
           <div className="text-sm text-gray-500">
             {isSaving && 'Saving...'}
