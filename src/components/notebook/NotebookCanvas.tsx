@@ -209,7 +209,7 @@ const handleInsightClick = useCallback((insightId: string, cellId: string) => {
     }
   }, []);
 
- // Generate minimap sections whenever notebook state changes
+// Generate minimap sections whenever notebook state changes
 useEffect(() => {
   if (!onSectionsChange) return;
 
@@ -243,23 +243,41 @@ useEffect(() => {
     currentPosition += baseHeight * 1.5;
   });
 
-  // Code cells with view mode awareness
+  // Code cells AND their insights
   cells.forEach((cell, index) => {
     const cellInsights = insights.filter(i => (i as LocalInsight).cellId === cell.id);
-    const insightCount = cellInsights.length;
     
+    // Add the cell itself
     sections.push({
       id: cell.id,
       type: 'analysis',
-      title: cell.query || `Cell ${index + 1}`,
-      color: insightCount > 0 ? '#10B981' : '#2196F3', // Green if has insights, blue otherwise
+      title: cell.query || `Analysis ${index + 1}`,
+      color: cellInsights.length > 0 ? '#10B981' : '#2196F3',
       position: currentPosition,
-      height: baseHeight * (1 + insightCount * 0.3),
+      height: baseHeight * 1.2,
     });
-    currentPosition += baseHeight * (1 + insightCount * 0.3);
+    currentPosition += baseHeight * 1.2;
+
+    // Add each insight under the cell
+    cellInsights.forEach((insight) => {
+      const insightTag = tags.find(t => t.id === insight.tagId);
+      const preview = insight.content.substring(0, 40);
+      
+      sections.push({
+        id: insight.id,
+        type: 'insight',
+        title: `[${insightTag?.name || 'Insight'}] ${preview}${insight.content.length > 40 ? '...' : ''}`,
+        color: insightTag?.color || '#4CAF50',
+        position: currentPosition,
+        height: baseHeight * 0.8,
+        tagName: insightTag?.name, // Extra data for display
+        cellId: cell.id, // Track which cell this belongs to
+      } as any);
+      currentPosition += baseHeight * 0.8;
+    });
   });
 
-  console.log('Generated minimap sections with view modes:', sections);
+  console.log('Generated minimap sections with insights:', sections);
   if (onSectionsChange) {
     onSectionsChange(sections);
   }
@@ -702,6 +720,53 @@ const handleSaveInsightFromModal = (content: string, tagId: string, hypothesisTa
     window.addEventListener('highlight-section', handleHighlight as EventListener);
     return () => window.removeEventListener('highlight-section', handleHighlight as EventListener);
   }, [cells, insights, selectCell]);
+
+  // Listen for minimap section clicks
+useEffect(() => {
+  const handleMinimapClick = (e: CustomEvent) => {
+    const { sectionId } = e.detail;
+    console.log('🗺️ Minimap clicked, scrolling to section:', sectionId);
+    
+    // Check if it's the dataset section
+    if (sectionId === 'dataset') {
+      const datasetElement = document.getElementById('section-dataset');
+      if (datasetElement && notebookScrollRef.current) {
+        datasetElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        console.log('✅ Scrolled to dataset section');
+      }
+      return;
+    }
+    
+    // Check if it's a hypothesis
+    const hypothesis = hypotheses.find(h => h.id === sectionId);
+    if (hypothesis) {
+      const hypothesisElement = document.getElementById('section-hypotheses');
+      if (hypothesisElement && notebookScrollRef.current) {
+        hypothesisElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        console.log('✅ Scrolled to hypothesis section');
+      }
+      return;
+    }
+    
+    // Check if it's a cell
+    const cell = cells.find(c => c.id === sectionId);
+    if (cell) {
+      const cellElement = cellRefs.current.get(cell.id);
+      if (cellElement && notebookScrollRef.current) {
+        cellElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        setHighlightedCellId(cell.id);
+        setTimeout(() => setHighlightedCellId(null), 2000);
+        console.log('✅ Scrolled to cell:', cell.id);
+      }
+      return;
+    }
+    
+    console.log('⚠️ Section not found:', sectionId);
+  };
+  
+  window.addEventListener('minimap-section-click', handleMinimapClick as EventListener);
+  return () => window.removeEventListener('minimap-section-click', handleMinimapClick as EventListener);
+}, [cells, hypotheses, notebookScrollRef, cellRefs, setHighlightedCellId]);
   
 
   return (
@@ -738,7 +803,7 @@ const handleSaveInsightFromModal = (content: string, tagId: string, hypothesisTa
     Add Cell
   </Button>
 
-{/* Global Code Collapse Toggle */}
+{/* Global Code Collapse Toggle
 <div className="ml-auto">
   <Button
     onClick={() => setGlobalCodeCollapsed(!globalCodeCollapsed)}
@@ -748,7 +813,7 @@ const handleSaveInsightFromModal = (content: string, tagId: string, hypothesisTa
   >
     {globalCodeCollapsed ? '▶️' : '▼'} {globalCodeCollapsed ? 'Expand' : 'Collapse'} All Code
   </Button>
-</div>
+</div> */}
 </div>
 
 {/* Notebook Content - Full Width */}

@@ -79,28 +79,39 @@ export default function CodeCell({
     const [isOutputCollapsed, setIsOutputCollapsed] = useState(false);
     const [isCellCollapsed, setIsCellCollapsed] = useState(false);
     
-  const [isHovered, setIsHovered] = useState(false);
-  const [showQueryInput, setShowQueryInput] = useState(!cell.content && !cell.query);
-  const [queryText, setQueryText] = useState(cell.query || '');
-
-// Check for pending query from "Try" button
-useEffect(() => {
-  // Check for cell-specific pending query
-  const pendingQuery = sessionStorage.getItem(`pendingQuery-${cell.id}`);
-  if (pendingQuery) {
-    // Only apply if this cell is truly empty
-    if (!cell.query && !cell.content) {
-      setQueryText(pendingQuery);
-      setShowQueryInput(true);
-      // IMPORTANT: Remove immediately to prevent other cells from picking it up
-      sessionStorage.removeItem(`pendingQuery-${cell.id}`);
-    } else {
-      // If cell is not empty, still remove the pending query to prevent leaks
-      sessionStorage.removeItem(`pendingQuery-${cell.id}`);
-    }
-  }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-}, [cell.id]); // Only run when cell.id changes (new cell created)
+    const [isHovered, setIsHovered] = useState(false);
+    const [showQueryInput, setShowQueryInput] = useState(!cell.content && !cell.query);
+    const [queryText, setQueryText] = useState(cell.query || '');
+    const hasInitialized = useRef(false);
+    
+    // Sync queryText with cell.query when it changes from the parent
+    useEffect(() => {
+      if (cell.query && cell.query !== queryText) {
+        setQueryText(cell.query);
+      }
+    }, [cell.query]);
+    
+    // Check for pending query from "Try" button - runs ONCE when component mounts
+    useEffect(() => {
+      // Prevent running multiple times
+      if (hasInitialized.current) return;
+      hasInitialized.current = true;
+      
+      const pendingQuery = sessionStorage.getItem(`pendingQuery-${cell.id}`);
+      if (pendingQuery) {
+        console.log(`🔍 Cell ${cell.id} found pending query:`, pendingQuery);
+        // Only apply if this cell is truly empty
+        if (!cell.query && !cell.content) {
+          console.log(`✅ Applying pending query to cell ${cell.id}`);
+          setQueryText(pendingQuery);
+          setShowQueryInput(true);
+        } else {
+          console.log(`❌ Cell ${cell.id} not empty, ignoring pending query`);
+        }
+        // CRITICAL: Always remove immediately
+        sessionStorage.removeItem(`pendingQuery-${cell.id}`);
+      }
+    }, []); // Empty array - run only once
 
   const editorRef = useRef<any>(null);
 

@@ -20,6 +20,9 @@ export default function ProjectPage() {
   const [writingWidth, setWritingWidth] = useState(400);
   const [isDraggingLeft, setIsDraggingLeft] = useState(false);
   const [isDraggingRight, setIsDraggingRight] = useState(false);
+
+  // Minimap sections state
+  const [minimapSections, setMinimapSections] = useState<any[]>([]);
   
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -111,12 +114,23 @@ export default function ProjectPage() {
       ref={containerRef}
       className="min-h-screen bg-gray-50 flex"
     >
-      {/* Panel 1: Minimap */}
-      <div 
+{/* Panel 1: Minimap */}
+<div 
         className="bg-white border-r border-gray-200 flex-shrink-0"
         style={{ width: `${minimapWidth}px` }}
       >
-        <Minimap projectId={projectId} />
+        <Minimap 
+          projectId={projectId} 
+          sections={minimapSections}
+          onSectionClick={(sectionId) => {
+            // Dispatch event to scroll to section in notebook
+            const event = new CustomEvent('minimap-section-click', {
+              detail: { sectionId },
+              bubbles: true,
+            });
+            window.dispatchEvent(event);
+          }}
+        />
       </div>
 
       {/* Left Resize Handle */}
@@ -130,8 +144,11 @@ export default function ProjectPage() {
       </div>
 
       {/* Panel 2: Notebook (Code + Insights) */}
-      <div className="flex-1 bg-white border-r border-gray-200 min-w-0">
-        <NotebookCanvas projectId={projectId} />
+<div className="flex-1 bg-white border-r border-gray-200 min-w-0">
+        <NotebookCanvas 
+          projectId={projectId}
+          onSectionsChange={setMinimapSections}
+        />
       </div>
 
       {/* Right Resize Handle */}

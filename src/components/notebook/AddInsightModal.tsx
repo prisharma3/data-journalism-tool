@@ -61,19 +61,24 @@ export default function AddInsightModal({
         try {
           const parsed = JSON.parse(pendingData);
           
-          // Only populate if this came from Accept/Accept All button
-          // Ignore if fromAcceptButton is false or undefined (means it's from Try button)
-          if (parsed.fromAcceptButton) {
+          // Populate modal if:
+          // 1. This came from Accept/Accept All button (fromAcceptButton = true)
+          // 2. This is editing an existing insight (insightId exists)
+          const shouldPopulate = parsed.fromAcceptButton || parsed.insightId;
+          
+          if (shouldPopulate) {
             setContent(parsed.content || '');
             setSelectedTagId(parsed.tagId || tags[0]?.id || '');
             setSelectedHypothesisTags(parsed.hypothesisTags || []);
             
-            // If there's an insightId, store it in editingInsightId for consistency
+            // If there's an insightId, store it in editingInsightId
             if (parsed.insightId) {
               sessionStorage.setItem('editingInsightId', parsed.insightId);
+              console.log('📝 Editing insight:', parsed.insightId);
             }
           } else {
-            // If opened without Accept/Accept All (e.g., from Try button), reset to empty
+            // If opened from Try button (no insightId and no fromAcceptButton), reset to empty
+            console.log('🔄 Reset modal - Try button or new insight');
             setContent('');
             setSelectedTagId(tags[0]?.id || '');
             setSelectedHypothesisTags([]);
