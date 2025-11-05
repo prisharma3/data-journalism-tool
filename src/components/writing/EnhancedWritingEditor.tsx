@@ -239,6 +239,70 @@ if (suggestion.type === 'add-analysis') {
     setDismissedSuggestions(prev => new Set([...prev, suggestionId]));
   };
 
+  const handleGenerateModification = async (suggestionId: string) => {
+    const suggestion = suggestions.find(s => s.id === suggestionId);
+    if (!suggestion) return;
+  
+    // If already expanded with modifications, collapse it
+    if (expandedSuggestionId === suggestionId && modificationOptions[suggestionId]) {
+      setExpandedSuggestionId(null);
+      return;
+    }
+  
+    // Expand and fetch modification suggestions
+    setExpandedSuggestionId(suggestionId);
+  
+    // Generate claim modifications
+    const claim = claims.find(c => c.id === suggestion.claimId);
+    if (!claim) return;
+  
+    try {
+      const modificationType = 
+        suggestion.type === 'weaken-claim' ? 'weaken' :
+        suggestion.type === 'add-caveat' ? 'caveat' :
+        suggestion.type === 'add-qualifier' ? 'weaken' :
+        'weaken';
+  
+      // Get the full evaluation for this claim
+      const evalResponse = await fetch('/api/claims/evaluate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          claim,
+          notebookContext,
+        }),
+      });
+  
+      if (!evalResponse.ok) {
+        throw new Error('Failed to evaluate claim');
+      }
+  
+      const evalData = await evalResponse.json();
+  
+      // Generate modifications
+      const result = await generateModifications(
+        claim.text,
+        evalData.toulminDiagram,
+        modificationType as any
+      );
+  
+      console.log('Modification suggestions:', result.suggestions);
+  
+      // Store the modification options for this suggestion ID
+      setModificationOptions(prev => ({
+        ...prev,
+        [suggestionId]: {
+          suggestions: result.suggestions || [],
+          explanations: result.explanations || [],
+          claim: claim
+        }
+      }));
+    } catch (err) {
+      console.error('Failed to generate modifications:', err);
+      alert('Failed to generate suggestions. Please try again.');
+    }
+  };
+
   const handleClaimClick = (claimId: string) => {
     console.log('Claim clicked:', claimId);
     
@@ -411,6 +475,7 @@ highlightedClaimId={highlightedClaimId}
   onAcceptSuggestion={handleAcceptSuggestion}
   onDismissSuggestion={handleDismissSuggestion}
   onViewEvidence={handleViewEvidence}
+  onGenerateModification={handleGenerateModification}
   expandedSuggestionId={expandedSuggestionId}
   analysisSuggestions={analysisSuggestions}
   modificationOptions={modificationOptions}

@@ -17,7 +17,7 @@ export default function ProjectPage() {
   
   // Panel widths
   const [minimapWidth, setMinimapWidth] = useState(120);
-  const [writingWidth, setWritingWidth] = useState(700);
+  const [writingWidth, setWritingWidth] = useState(800);
   const [isDraggingLeft, setIsDraggingLeft] = useState(false);
   const [isDraggingRight, setIsDraggingRight] = useState(false);
 
@@ -29,7 +29,7 @@ export default function ProjectPage() {
   const MIN_MINIMAP = 48;
   const MAX_MINIMAP = 150;
   const MIN_WRITING = 500;
-  const MAX_WRITING = 700;
+  const MAX_WRITING = 800;
 
   useEffect(() => {
     if (!isAuthenticated || !user) {

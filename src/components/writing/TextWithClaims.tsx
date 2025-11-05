@@ -93,6 +93,43 @@ export function TextWithClaims({
     return 'decoration-blue-500 decoration-2 decoration-solid';
   };
 
+  // Add this new function after the getTooltip function (around line 90)
+const getUnderlineStyle = (claim: ClaimStructure): string => {
+  const claimSuggestions = suggestions.filter(s => s.claimId === claim.id);
+  
+  if (claimSuggestions.length === 0) {
+    return 'text-decoration: underline; text-decoration-color: rgb(34, 197, 94); text-decoration-thickness: 2px; text-decoration-style: solid;';
+  }
+
+  const topSuggestion = claimSuggestions.sort((a, b) => b.priority - a.priority)[0];
+
+  // Remove claim - red wavy
+  if (topSuggestion.type === 'remove-claim') {
+    return 'text-decoration: underline; text-decoration-color: rgb(239, 68, 68); text-decoration-thickness: 2px; text-decoration-style: wavy;';
+  }
+  // Add analysis - blue solid
+  if (topSuggestion.type === 'add-analysis') {
+    return 'text-decoration: underline; text-decoration-color: rgb(59, 130, 246); text-decoration-thickness: 2px; text-decoration-style: solid;';
+  }
+  // Weaken claim or add qualifier - yellow solid
+  if (topSuggestion.type === 'weaken-claim' || topSuggestion.type === 'add-qualifier') {
+    return 'text-decoration: underline; text-decoration-color: rgb(234, 179, 8); text-decoration-thickness: 2px; text-decoration-style: solid;';
+  }
+  // Add caveat - orange solid
+  if (topSuggestion.type === 'add-caveat') {
+    return 'text-decoration: underline; text-decoration-color: rgb(249, 115, 22); text-decoration-thickness: 2px; text-decoration-style: solid;';
+  }
+  
+  // Fallback based on severity
+  if (topSuggestion.severity === 'critical') {
+    return 'text-decoration: underline; text-decoration-color: rgb(239, 68, 68); text-decoration-thickness: 2px; text-decoration-style: wavy;';
+  }
+  if (topSuggestion.severity === 'warning') {
+    return 'text-decoration: underline; text-decoration-color: rgb(249, 115, 22); text-decoration-thickness: 2px; text-decoration-style: solid;';
+  }
+  return 'text-decoration: underline; text-decoration-color: rgb(59, 130, 246); text-decoration-thickness: 2px; text-decoration-style: solid;';
+};
+
   const getTooltip = (claim: ClaimStructure) => {
     const claimSuggestions = suggestions.filter(s => s.claimId === claim.id);
     if (claimSuggestions.length === 0) {
@@ -143,7 +180,9 @@ export function TextWithClaims({
           const tooltip = getTooltip(segment.claim);
           const highlightClass = isHighlighted ? 'bg-yellow-100 ring-2 ring-yellow-400' : '';
           
-          return `<span data-claim-id="${segment.claim.id}" class="underline underline-offset-4 ${underlineClass} cursor-pointer hover:bg-gray-100 transition-colors ${highlightClass}" title="${tooltip.replace(/"/g, '&quot;')}">${segment.text}</span>`;
+          const inlineStyle = getUnderlineStyle(segment.claim);
+          return `<span data-claim-id="${segment.claim.id}" class="cursor-pointer hover:bg-gray-100 transition-colors ${highlightClass}" style="${inlineStyle} text-underline-offset: 4px;" title="${tooltip.replace(/"/g, '&quot;')}">${segment.text}</span>`;
+
         }
         return segment.text;
       }).join('');

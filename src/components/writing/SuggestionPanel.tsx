@@ -23,6 +23,7 @@ interface SuggestionPanelProps {
     modificationOptions: {[key: string]: any};
     onCloseExpanded: () => void;
     onSelectModification: (suggestionId: string, modificationIndex: number) => void;
+    onGenerateModification: (suggestionId: string) => void;
     projectId?: string;
   }
 
@@ -48,6 +49,7 @@ export function SuggestionPanel({
     modificationOptions,
     onCloseExpanded,
     onSelectModification,
+    onGenerateModification,
     projectId,
   }: SuggestionPanelProps) {
 
@@ -199,16 +201,16 @@ export function SuggestionPanel({
                     )}
                     
                     {(suggestion.type === 'weaken-claim' || suggestion.type === 'add-caveat' || suggestion.type === 'add-qualifier') && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          // Handle generating modifications
-                        }}
-                        className="flex-1 px-3 py-1.5 bg-green-600 text-white rounded text-xs hover:bg-green-700 transition-colors"
-                      >
-                        ✏️ Fix This Issue
-                      </button>
-                    )}
+  <button
+    onClick={(e) => {
+      e.stopPropagation();
+      onGenerateModification(suggestion.id);
+    }}
+    className="flex-1 px-3 py-1.5 bg-green-600 text-white rounded text-xs hover:bg-green-700 transition-colors"
+  >
+    ✏️ Fix This Issue
+  </button>
+)}
                   </div>
   
                   {/* Expanded sections can be added here if needed */}
