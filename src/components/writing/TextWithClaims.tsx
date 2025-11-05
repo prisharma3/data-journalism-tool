@@ -138,20 +138,29 @@ const getUnderlineStyle = (claim: ClaimStructure): string => {
     return claimSuggestions[0].message;
   };
 
-  // Handle content changes in editable mode
-  const handleInput = () => {
-    if (!isEditable || !editorRef.current || !onContentChange || isComposingRef.current) return;
-    
-    const newText = editorRef.current.innerText;
-    
-    // Update tracking ref to prevent re-render loop
-    lastRenderedTextRef.current = newText;
-    
-    const selection = window.getSelection();
-    const cursorPos = selection?.anchorOffset || 0;
-    
-    onContentChange(newText, cursorPos);
-  };
+// Handle content changes in editable mode
+const handleInput = () => {
+  if (!isEditable || !editorRef.current || !onContentChange || isComposingRef.current) return;
+  
+  const newText = editorRef.current.innerText;
+  
+  // Update tracking ref to prevent re-render loop
+  lastRenderedTextRef.current = newText;
+  
+  // Get proper cursor position by walking through all text nodes
+  const selection = window.getSelection();
+  let cursorPos = 0;
+  
+  if (selection && selection.rangeCount > 0) {
+    const range = selection.getRangeAt(0);
+    const preCaretRange = range.cloneRange();
+    preCaretRange.selectNodeContents(editorRef.current);
+    preCaretRange.setEnd(range.endContainer, range.endOffset);
+    cursorPos = preCaretRange.toString().length;
+  }
+  
+  onContentChange(newText, cursorPos);
+};
 
 //   // Only update DOM when text changes from external source (not from typing)
 //   useEffect(() => {
@@ -356,16 +365,78 @@ useEffect(() => {
     );
   }
 
-// Editable view - need to initialize content on mount and update when segments change
+// // Editable view - need to initialize content on mount and update when segments change
+// useEffect(() => {
+//   if (isEditable && editorRef.current) {
+//     // Save cursor position before updating
+//     const selection = window.getSelection();
+//     let cursorOffset = 0;
+//     if (selection && selection.rangeCount > 0) {
+//       const range = selection.getRangeAt(0);
+//       cursorOffset = range.startOffset;
+//     }
+    
+//     // Update the HTML with claim spans
+//     editorRef.current.innerHTML = segments.map((segment) => {
+//       if (segment.claim) {
+//         const underlineStyle = getUnderlineStyle(segment.claim);
+//         const tooltip = getTooltip(segment.claim);
+//         return `<span data-claim-id="${segment.claim.id}" style="${underlineStyle}" class="cursor-pointer hover:bg-gray-100 transition-colors" title="${tooltip.replace(/"/g, '&quot;')}">${segment.text}</span>`;
+//       }
+//       return segment.text;
+//     }).join('');
+    
+//     // Restore cursor position
+//     if (cursorOffset > 0) {
+//       requestAnimationFrame(() => {
+//         try {
+//           const range = document.createRange();
+//           const sel = window.getSelection();
+//           const walker = document.createTreeWalker(
+//             editorRef.current!,
+//             NodeFilter.SHOW_TEXT,
+//             null
+//           );
+          
+//           let currentOffset = 0;
+//           let targetNode = null;
+//           let targetOffset = 0;
+          
+//           while (walker.nextNode()) {
+//             const node = walker.currentNode;
+//             const nodeLength = node.textContent?.length || 0;
+            
+//             if (currentOffset + nodeLength >= cursorOffset) {
+//               targetNode = node;
+//               targetOffset = cursorOffset - currentOffset;
+//               break;
+//             }
+//             currentOffset += nodeLength;
+//           }
+          
+//           if (targetNode) {
+//             range.setStart(targetNode, targetOffset);
+//             range.collapse(true);
+//             sel?.removeAllRanges();
+//             sel?.addRange(range);
+//           }
+//         } catch (e) {
+//           console.warn('Could not restore cursor:', e);
+//         }
+//       });
+//     }
+//   }
+// }, [isEditable, segments, suggestions]); // Add suggestions to deps so colors update
+
+// Editable view - initialize content only on first mount or when text changes externally
 useEffect(() => {
-  if (isEditable && editorRef.current) {
-    // Save cursor position before updating
-    const selection = window.getSelection();
-    let cursorOffset = 0;
-    if (selection && selection.rangeCount > 0) {
-      const range = selection.getRangeAt(0);
-      cursorOffset = range.startOffset;
-    }
+  if (!isEditable || !editorRef.current) return;
+  
+  const currentText = editorRef.current.innerText;
+  
+  // Only update if this is first render or text changed from external source
+  if (currentText === '' || (text !== currentText && text !== lastRenderedTextRef.current)) {
+    lastRenderedTextRef.current = text;
     
     // Update the HTML with claim spans
     editorRef.current.innerHTML = segments.map((segment) => {
@@ -376,48 +447,23 @@ useEffect(() => {
       }
       return segment.text;
     }).join('');
-    
-    // Restore cursor position
-    if (cursorOffset > 0) {
-      requestAnimationFrame(() => {
-        try {
-          const range = document.createRange();
-          const sel = window.getSelection();
-          const walker = document.createTreeWalker(
-            editorRef.current!,
-            NodeFilter.SHOW_TEXT,
-            null
-          );
-          
-          let currentOffset = 0;
-          let targetNode = null;
-          let targetOffset = 0;
-          
-          while (walker.nextNode()) {
-            const node = walker.currentNode;
-            const nodeLength = node.textContent?.length || 0;
-            
-            if (currentOffset + nodeLength >= cursorOffset) {
-              targetNode = node;
-              targetOffset = cursorOffset - currentOffset;
-              break;
-            }
-            currentOffset += nodeLength;
-          }
-          
-          if (targetNode) {
-            range.setStart(targetNode, targetOffset);
-            range.collapse(true);
-            sel?.removeAllRanges();
-            sel?.addRange(range);
-          }
-        } catch (e) {
-          console.warn('Could not restore cursor:', e);
-        }
-      });
-    }
   }
-}, [isEditable, segments, suggestions]); // Add suggestions to deps so colors update
+}, [isEditable, text]); // Only depend on text, not segments or suggestions
+
+// Update underline colors when suggestions change, without resetting content
+useEffect(() => {
+  if (!isEditable || !editorRef.current) return;
+  
+  const allSpans = editorRef.current.querySelectorAll('[data-claim-id]');
+  allSpans.forEach((span) => {
+    const claimId = span.getAttribute('data-claim-id');
+    const claim = claims.find(c => c.id === claimId);
+    if (claim) {
+      const underlineStyle = getUnderlineStyle(claim);
+      (span as HTMLElement).setAttribute('style', underlineStyle);
+    }
+  });
+}, [isEditable, suggestions, claims]);
 
 // Update highlighting when highlightedClaimId changes
 useEffect(() => {

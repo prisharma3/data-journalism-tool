@@ -34,51 +34,59 @@ export function useClaimEvaluation({
 
   const lastTextRef = useRef<string>('');
 
-  /**
-   * Evaluate detected claims
-   */
-  const evaluateClaims = useCallback(async (claimsToEvaluate: ClaimStructure[]) => {
-    console.log('🔬 Starting evaluation for', claimsToEvaluate.length, 'claims');
-    setIsEvaluating(true);
-    const allSuggestions: WritingSuggestion[] = [];
+/**
+ * Evaluate detected claims
+ */
+const evaluateClaims = useCallback(async (claimsToEvaluate: ClaimStructure[]) => {
+  console.log('🔬 Starting evaluation for', claimsToEvaluate.length, 'claims');
+  setIsEvaluating(true);
+  const allSuggestions: WritingSuggestion[] = [];
 
-    try {
-      // Evaluate each claim
-      for (const claim of claimsToEvaluate) {
-        console.log('📡 POST /api/claims/evaluate for claim:', claim.text.substring(0, 50));
-        
-        const response = await fetch('/api/claims/evaluate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            claim,
-            notebookContext,
-          }),
+  try {
+    // Evaluate each claim
+    for (const claim of claimsToEvaluate) {
+      console.log('📡 POST /api/claims/evaluate for claim:', claim.text.substring(0, 50));
+      
+      const response = await fetch('/api/claims/evaluate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          claim,
+          notebookContext,
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('✅ Evaluation response:', {
+          suggestions: data.suggestions?.length || 0,
+          issues: data.toulminDiagram?.issues?.length || 0
         });
-
-        if (response.ok) {
-          const data = await response.json();
-          console.log('✅ Evaluation response:', {
-            suggestions: data.suggestions?.length || 0,
-            issues: data.toulminDiagram?.issues?.length || 0
-          });
-          
-          if (data.suggestions && data.suggestions.length > 0) {
-            allSuggestions.push(...data.suggestions);
-          }
+        
+        // ADD THIS DETAILED LOGGING
+        if (data.suggestions && data.suggestions.length > 0) {
+          console.log('📋 Suggestion types received:', data.suggestions.map((s: any) => ({
+            type: s.type,
+            severity: s.severity,
+            message: s.message.substring(0, 50)
+          })));
+          allSuggestions.push(...data.suggestions);
         } else {
-          console.error('❌ Evaluation failed:', response.status, await response.text());
+          console.log('⚠️ No suggestions generated for this claim');
         }
+      } else {
+        console.error('❌ Evaluation failed:', response.status, await response.text());
       }
-
-      console.log('📊 Total suggestions collected:', allSuggestions.length);
-      setSuggestions(allSuggestions);
-    } catch (err: any) {
-      console.error('Claim evaluation error:', err);
-    } finally {
-      setIsEvaluating(false);
     }
-  }, [notebookContext]);
+
+    console.log('📊 Total suggestions collected:', allSuggestions.length);
+    setSuggestions(allSuggestions);
+  } catch (err: any) {
+    console.error('Claim evaluation error:', err);
+  } finally {
+    setIsEvaluating(false);
+  }
+}, [notebookContext]);
 
   /**
    * Detect claims in text
@@ -237,33 +245,36 @@ export function useClaimEvaluation({
     }
   }, [notebookContext]);
 
-  // Trigger detection when text changes
-  useEffect(() => {
-    if (!enabled || !text) {
-      if (text?.length === 0) {
-        lastTextRef.current = '';
-      }
-      return;
+// Trigger detection when text changes
+useEffect(() => {
+  if (!enabled || !text) {
+    if (text?.length === 0) {
+      lastTextRef.current = '';
+      setClaims([]);
+      setSuggestions([]);
     }
-    
-    // Only detect if text actually changed
-    if (text === lastTextRef.current) {
-      return;
-    }
-    
-    // Create a new debounced function for this effect
-    const debouncedDetect = debounce(() => {
-      detectClaims();
-    }, 2000);
-    
-    // Trigger debounced detection
-    debouncedDetect();
-    
-    // Cleanup
-    return () => {
-      debouncedDetect.cancel();
-    };
-  }, [text, enabled, detectClaims]);
+    return;
+  }
+  
+  // Only detect if text actually changed
+  if (text === lastTextRef.current) {
+    return;
+  }
+  
+  // Create a new debounced function for this effect
+  const debouncedDetect = debounce(() => {
+    console.log('🔄 Debounced detection triggered for text length:', text.length);
+    detectClaims();
+  }, 1000); // Reduced from 2000ms to 1000ms
+  
+  // Trigger debounced detection
+  debouncedDetect();
+  
+  // Cleanup
+  return () => {
+    debouncedDetect.cancel();
+  };
+}, [text, enabled, detectClaims]);
 
   // Trigger remembrance agent when cursor moves
   useEffect(() => {

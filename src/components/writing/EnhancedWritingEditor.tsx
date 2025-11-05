@@ -443,9 +443,9 @@ const handleGenerateModification = async (suggestionId: string) => {
 
 
   return (
-    <div className="flex h-full">
-      {/* Main editor area */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex h-full overflow-hidden">
+        {/* Main editor area */}
+        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Toolbar */}
         <div className="border-b border-gray-200 bg-white px-4 py-2 flex items-center gap-4">
           <div className="flex items-center gap-2">
@@ -497,29 +497,10 @@ const handleGenerateModification = async (suggestionId: string) => {
 {/* Editor - Single editable view with inline claim highlights */}
 <div className="flex-1 overflow-y-auto bg-white">
           <div className="max-w-4xl mx-auto p-8">
-          <TextWithClaims
-  text={content}
-  claims={claims}
-  suggestions={suggestions}
-  onClaimClick={handleClaimClick}
-  highlightedClaimId={highlightedClaimId}
-  onContentChange={(newText, newCursor) => {
-    handleContentChange(newText, newCursor);
-  }}
-  isEditable={true}
-/>
-            
-            {/* Claim count indicator */}
-            {claims.length > 0 && (
-              <div className="mt-4 text-sm text-gray-500 text-center">
-                {claims.length} claim{claims.length !== 1 ? 's' : ''} detected • Click underlined text for details
-              </div>
-            )}
-
-{/* Underline legend */}
+          
+          {/* Underline legend - MOVED TO TOP */}
 {claims.length > 0 && (
-  <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
-    <p className="text-xs font-semibold text-gray-700 mb-2">Underline Colors:</p>
+  <div className="mb-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
     <div className="grid grid-cols-2 gap-2 text-xs">
       <div className="flex items-center gap-2">
         <span className="underline decoration-green-500 decoration-2">Green</span>
@@ -544,6 +525,18 @@ const handleGenerateModification = async (suggestionId: string) => {
     </div>
   </div>
 )}
+
+          <TextWithClaims
+  text={content}
+  claims={claims}
+  suggestions={suggestions}
+  onClaimClick={handleClaimClick}
+  highlightedClaimId={highlightedClaimId}
+  onContentChange={(newText, newCursor) => {
+    handleContentChange(newText, newCursor);
+  }}
+  isEditable={true}
+/>
           </div>
         </div>
 
