@@ -153,83 +153,172 @@ const getUnderlineStyle = (claim: ClaimStructure): string => {
     onContentChange(newText, cursorPos);
   };
 
-  // Only update DOM when text changes from external source (not from typing)
-  useEffect(() => {
-    if (!isEditable || !editorRef.current) return;
+//   // Only update DOM when text changes from external source (not from typing)
+//   useEffect(() => {
+//     if (!isEditable || !editorRef.current) return;
     
-    const currentText = editorRef.current.innerText;
+//     const currentText = editorRef.current.innerText;
     
-    // Only update if text changed externally (not from our own typing)
-    if (text !== currentText && text !== lastRenderedTextRef.current) {
-      lastRenderedTextRef.current = text;
+//     // Only update if text changed externally (not from our own typing)
+//     if (text !== currentText && text !== lastRenderedTextRef.current) {
+//       lastRenderedTextRef.current = text;
       
-      // Save cursor position
-      const selection = window.getSelection();
-      let cursorOffset = 0;
+//       // Save cursor position
+//       const selection = window.getSelection();
+//       let cursorOffset = 0;
       
-      if (selection && selection.rangeCount > 0) {
-        const range = selection.getRangeAt(0);
-        cursorOffset = range.startOffset;
-      }
+//       if (selection && selection.rangeCount > 0) {
+//         const range = selection.getRangeAt(0);
+//         cursorOffset = range.startOffset;
+//       }
       
-      // Update the HTML
-      editorRef.current.innerHTML = segments.map((segment) => {
-        if (segment.claim) {
-          const isHighlighted = highlightedClaimId === segment.claim.id;
-          const underlineClass = getUnderlineClass(segment.claim);
-          const tooltip = getTooltip(segment.claim);
-          const highlightClass = isHighlighted ? 'bg-yellow-100 ring-2 ring-yellow-400' : '';
+//       // Update the HTML
+//       editorRef.current.innerHTML = segments.map((segment) => {
+//         if (segment.claim) {
+//           const isHighlighted = highlightedClaimId === segment.claim.id;
+//           const underlineClass = getUnderlineClass(segment.claim);
+//           const tooltip = getTooltip(segment.claim);
+//           const highlightClass = isHighlighted ? 'bg-yellow-100 ring-2 ring-yellow-400' : '';
 
-          const claimUnderlineClass = getUnderlineClass(segment.claim);
-return `<span data-claim-id="${segment.claim.id}" class="underline underline-offset-4 ${claimUnderlineClass} cursor-pointer hover:bg-gray-100 transition-colors ${highlightClass}" title="${tooltip.replace(/"/g, '&quot;')}">${segment.text}</span>`;
-        }
-        return segment.text;
-      }).join('');
+//           const claimUnderlineClass = getUnderlineClass(segment.claim);
+// return `<span data-claim-id="${segment.claim.id}" class="underline underline-offset-4 ${claimUnderlineClass} cursor-pointer hover:bg-gray-100 transition-colors ${highlightClass}" title="${tooltip.replace(/"/g, '&quot;')}">${segment.text}</span>`;
+//         }
+//         return segment.text;
+//       }).join('');
       
-      // Restore cursor
-      requestAnimationFrame(() => {
-        if (editorRef.current) {
-          try {
-            const range = document.createRange();
-            const sel = window.getSelection();
+//       // Restore cursor
+//       requestAnimationFrame(() => {
+//         if (editorRef.current) {
+//           try {
+//             const range = document.createRange();
+//             const sel = window.getSelection();
             
-            // Walk through text nodes to find cursor position
-            const walker = document.createTreeWalker(
-              editorRef.current,
-              NodeFilter.SHOW_TEXT,
-              null
-            );
+//             // Walk through text nodes to find cursor position
+//             const walker = document.createTreeWalker(
+//               editorRef.current,
+//               NodeFilter.SHOW_TEXT,
+//               null
+//             );
             
-            let currentOffset = 0;
-            let targetNode = null;
-            let targetOffset = 0;
+//             let currentOffset = 0;
+//             let targetNode = null;
+//             let targetOffset = 0;
             
-            while (walker.nextNode()) {
-              const node = walker.currentNode;
-              const nodeLength = node.textContent?.length || 0;
+//             while (walker.nextNode()) {
+//               const node = walker.currentNode;
+//               const nodeLength = node.textContent?.length || 0;
               
-              if (currentOffset + nodeLength >= cursorOffset) {
-                targetNode = node;
-                targetOffset = cursorOffset - currentOffset;
-                break;
-              }
+//               if (currentOffset + nodeLength >= cursorOffset) {
+//                 targetNode = node;
+//                 targetOffset = cursorOffset - currentOffset;
+//                 break;
+//               }
               
-              currentOffset += nodeLength;
-            }
+//               currentOffset += nodeLength;
+//             }
             
-            if (targetNode) {
-              range.setStart(targetNode, targetOffset);
-              range.collapse(true);
-              sel?.removeAllRanges();
-              sel?.addRange(range);
-            }
-          } catch (e) {
-            console.warn('Could not restore cursor:', e);
-          }
-        }
-      });
+//             if (targetNode) {
+//               range.setStart(targetNode, targetOffset);
+//               range.collapse(true);
+//               sel?.removeAllRanges();
+//               sel?.addRange(range);
+//             }
+//           } catch (e) {
+//             console.warn('Could not restore cursor:', e);
+//           }
+//         }
+//       });
+//     }
+//   }, [text, segments, highlightedClaimId, isEditable]);
+
+// Only update DOM when text changes from external source (not from typing)
+useEffect(() => {
+  if (!isEditable || !editorRef.current) return;
+  
+  const currentText = editorRef.current.innerText;
+  
+  // Only update if text changed externally (not from our own typing)
+  if (text !== currentText && text !== lastRenderedTextRef.current) {
+    lastRenderedTextRef.current = text;
+    
+    // Save cursor position
+    const selection = window.getSelection();
+    let cursorOffset = 0;
+    
+    if (selection && selection.rangeCount > 0) {
+      const range = selection.getRangeAt(0);
+      cursorOffset = range.startOffset;
     }
-  }, [text, segments, highlightedClaimId, isEditable]);
+    
+    // Update the HTML
+    editorRef.current.innerHTML = segments.map((segment) => {
+      if (segment.claim) {
+        const isHighlighted = highlightedClaimId === segment.claim.id;
+        const underlineClass = getUnderlineClass(segment.claim);
+        const tooltip = getTooltip(segment.claim);
+        const highlightClass = isHighlighted ?
+          'bg-yellow-100 ring-2 ring-yellow-400' : '';
+
+        return `<span data-claim-id="${segment.claim.id}" class="underline underline-offset-4 ${underlineClass} cursor-pointer hover:bg-gray-100 transition-colors ${highlightClass}" title="${tooltip.replace(/"/g, '&quot;')}">${segment.text}</span>`;
+      }
+      return segment.text;
+    }).join('');
+    
+    // Restore cursor
+    requestAnimationFrame(() => {
+      if (editorRef.current) {
+        try {
+          const range = document.createRange();
+          const sel = window.getSelection();
+          
+          // Walk through text nodes to find cursor position
+          const walker = document.createTreeWalker(
+            editorRef.current,
+            NodeFilter.SHOW_TEXT,
+            null
+          );
+          
+          let currentOffset = 0;
+          let targetNode = null;
+          let targetOffset = 0;
+          
+          while (walker.nextNode()) {
+            const node = walker.currentNode;
+            const nodeLength = node.textContent?.length || 0;
+            
+            if (currentOffset + nodeLength >= cursorOffset) {
+              targetNode = node;
+              targetOffset = cursorOffset - currentOffset;
+              break;
+            }
+            
+            currentOffset += nodeLength;
+          }
+          
+          if (targetNode) {
+            range.setStart(targetNode, targetOffset);
+            range.collapse(true);
+            sel?.removeAllRanges();
+            sel?.addRange(range);
+          }
+        } catch (e) {
+          console.warn('Could not restore cursor:', e);
+        }
+      }
+    });
+  } else if (highlightedClaimId !== null) {
+    // Just update the highlighting without changing text
+    const allSpans = editorRef.current.querySelectorAll('[data-claim-id]');
+    allSpans.forEach((span) => {
+      const claimId = span.getAttribute('data-claim-id');
+      if (claimId === highlightedClaimId) {
+        span.classList.add('bg-yellow-100', 'ring-2', 'ring-yellow-400');
+      } else {
+        span.classList.remove('bg-yellow-100', 'ring-2', 'ring-yellow-400');
+      }
+    });
+  }
+}, [text, segments, highlightedClaimId, isEditable]);
 
   // Composition event handlers for IME input
   const handleCompositionStart = () => {
@@ -267,29 +356,108 @@ return `<span data-claim-id="${segment.claim.id}" class="underline underline-off
     );
   }
 
-  // Editable view
-  return (
-    <div
-      ref={editorRef}
-      contentEditable={true}
-      suppressContentEditableWarning={true}
-      onInput={handleInput}
-      onCompositionStart={handleCompositionStart}
-      onCompositionEnd={handleCompositionEnd}
-      onBlur={handleInput}
-      className="prose max-w-none outline-none min-h-[200px] focus:outline-none"
-      style={{ whiteSpace: 'pre-wrap' }}
-      onClick={(e) => {
-        const target = e.target as HTMLElement;
-        const claimSpan = target.closest('[data-claim-id]');
-        if (claimSpan) {
-          const claimId = claimSpan.getAttribute('data-claim-id');
-          if (claimId) {
-            e.preventDefault();
-            onClaimClick(claimId);
+// Editable view - need to initialize content on mount and update when segments change
+useEffect(() => {
+  if (isEditable && editorRef.current) {
+    // Save cursor position before updating
+    const selection = window.getSelection();
+    let cursorOffset = 0;
+    if (selection && selection.rangeCount > 0) {
+      const range = selection.getRangeAt(0);
+      cursorOffset = range.startOffset;
+    }
+    
+    // Update the HTML with claim spans
+    editorRef.current.innerHTML = segments.map((segment) => {
+      if (segment.claim) {
+        const underlineStyle = getUnderlineStyle(segment.claim);
+        const tooltip = getTooltip(segment.claim);
+        return `<span data-claim-id="${segment.claim.id}" style="${underlineStyle}" class="cursor-pointer hover:bg-gray-100 transition-colors" title="${tooltip.replace(/"/g, '&quot;')}">${segment.text}</span>`;
+      }
+      return segment.text;
+    }).join('');
+    
+    // Restore cursor position
+    if (cursorOffset > 0) {
+      requestAnimationFrame(() => {
+        try {
+          const range = document.createRange();
+          const sel = window.getSelection();
+          const walker = document.createTreeWalker(
+            editorRef.current!,
+            NodeFilter.SHOW_TEXT,
+            null
+          );
+          
+          let currentOffset = 0;
+          let targetNode = null;
+          let targetOffset = 0;
+          
+          while (walker.nextNode()) {
+            const node = walker.currentNode;
+            const nodeLength = node.textContent?.length || 0;
+            
+            if (currentOffset + nodeLength >= cursorOffset) {
+              targetNode = node;
+              targetOffset = cursorOffset - currentOffset;
+              break;
+            }
+            currentOffset += nodeLength;
           }
+          
+          if (targetNode) {
+            range.setStart(targetNode, targetOffset);
+            range.collapse(true);
+            sel?.removeAllRanges();
+            sel?.addRange(range);
+          }
+        } catch (e) {
+          console.warn('Could not restore cursor:', e);
         }
-      }}
-    />
-  );
+      });
+    }
+  }
+}, [isEditable, segments, suggestions]); // Add suggestions to deps so colors update
+
+// Update highlighting when highlightedClaimId changes
+useEffect(() => {
+  if (isEditable && editorRef.current && highlightedClaimId) {
+    const allSpans = editorRef.current.querySelectorAll('[data-claim-id]');
+    allSpans.forEach((span) => {
+      const claimId = span.getAttribute('data-claim-id');
+      if (claimId === highlightedClaimId) {
+        (span as HTMLElement).classList.add('bg-yellow-100', 'ring-2', 'ring-yellow-400');
+      } else {
+        (span as HTMLElement).classList.remove('bg-yellow-100', 'ring-2', 'ring-yellow-400');
+      }
+    });
+  }
+}, [isEditable, highlightedClaimId]);
+
+// Editable view
+return (
+  <div
+    ref={editorRef}
+    contentEditable={true}
+    suppressContentEditableWarning={true}
+    onInput={handleInput}
+    onCompositionStart={handleCompositionStart}
+    onCompositionEnd={handleCompositionEnd}
+    onBlur={handleInput}
+    className="prose max-w-none outline-none min-h-[200px] focus:outline-none"
+    style={{ whiteSpace: 'pre-wrap' }}
+    onClick={(e) => {
+      const target = e.target as HTMLElement;
+      const claimSpan = target.closest('[data-claim-id]');
+      if (claimSpan) {
+        const claimId = claimSpan.getAttribute('data-claim-id');
+        if (claimId) {
+          e.preventDefault();
+          onClaimClick(claimId);
+        }
+      }
+    }}
+  />
+);
+
 }

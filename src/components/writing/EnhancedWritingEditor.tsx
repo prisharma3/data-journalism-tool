@@ -35,6 +35,8 @@ const [analysisSuggestions, setAnalysisSuggestions] = useState<{[key: string]: a
 
 const [modificationOptions, setModificationOptions] = useState<{[key: string]: any}>({});
 
+const [loadingModifications, setLoadingModifications] = useState<Set<string>>(new Set());
+
 const [fixedPositions, setFixedPositions] = useState<Array<{from: number, to: number, fixedAt: Date}>>([]);
     
 // Sync with initialContent whenever it changes (from store)
@@ -239,88 +241,193 @@ if (suggestion.type === 'add-analysis') {
     setDismissedSuggestions(prev => new Set([...prev, suggestionId]));
   };
 
-  const handleGenerateModification = async (suggestionId: string) => {
+//   const handleGenerateModification = async (suggestionId: string) => {
+//   const suggestion = suggestions.find(s => s.id === suggestionId);
+//   if (!suggestion) return;
+
+//   // If already expanded with modifications, collapse it
+//   if (expandedSuggestionId === suggestionId && modificationOptions[suggestionId]) {
+//     setExpandedSuggestionId(null);
+//     return;
+//   }
+
+//   // Expand and fetch modification suggestions
+//   setExpandedSuggestionId(suggestionId);
+
+//   // Generate claim modifications
+//   const claim = claims.find(c => c.id === suggestion.claimId);
+//   if (!claim) return;
+
+//   try {
+//     const modificationType = 
+//       suggestion.type === 'weaken-claim' ? 'weaken' :
+//       suggestion.type === 'add-caveat' ? 'caveat' :
+//       suggestion.type === 'add-qualifier' ? 'weaken' :
+//       'weaken';
+
+//     // Get the full evaluation for this claim
+//     const evalResponse = await fetch('/api/claims/evaluate', {
+//       method: 'POST',
+//       headers: { 'Content-Type': 'application/json' },
+//       body: JSON.stringify({
+//         claim,
+//         notebookContext,
+//       }),
+//     });
+
+//     if (!evalResponse.ok) {
+//       throw new Error('Failed to evaluate claim');
+//     }
+
+//     const evalData = await evalResponse.json();
+
+//     // Generate modifications
+//     const result = await generateModifications(
+//       claim.text,
+//       evalData.toulminDiagram,
+//       modificationType as any
+//     );
+
+//     console.log('Modification suggestions:', result.suggestions);
+
+//     // Store the modification options for this suggestion ID
+//     setModificationOptions(prev => ({
+//       ...prev,
+//       [suggestionId]: {
+//         suggestions: result.suggestions || [],
+//         explanations: result.explanations || [],
+//         claim: claim
+//       }
+//     }));
+//   } catch (err) {
+//     console.error('Failed to generate modifications:', err);
+//     alert('Failed to generate suggestions. Please try again.');
+//   }
+// };
+
+const handleGenerateModification = async (suggestionId: string) => {
   const suggestion = suggestions.find(s => s.id === suggestionId);
   if (!suggestion) return;
 
-  // If already expanded with modifications, collapse it
-  if (expandedSuggestionId === suggestionId && modificationOptions[suggestionId]) {
-    setExpandedSuggestionId(null);
-    return;
-  }
-
-  // Expand and fetch modification suggestions
-  setExpandedSuggestionId(suggestionId);
-
-  // Generate claim modifications
   const claim = claims.find(c => c.id === suggestion.claimId);
   if (!claim) return;
 
-  try {
-    const modificationType = 
-      suggestion.type === 'weaken-claim' ? 'weaken' :
-      suggestion.type === 'add-caveat' ? 'caveat' :
-      suggestion.type === 'add-qualifier' ? 'weaken' :
-      'weaken';
+  // Add to loading set
+  setLoadingModifications(prev => new Set([...prev, suggestionId]));
+  setExpandedSuggestionId(suggestionId);
 
-    // Get the full evaluation for this claim
-    const evalResponse = await fetch('/api/claims/evaluate', {
+  try {
+    const response = await fetch('/api/claims/suggest-modifications', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        claim,
-        notebookContext,
+        claimText: claim.text,
+        toulminEvaluation: { overallScore: 50, strength: 'moderate', issues: [] }, // Minimal evaluation
+        modificationType: suggestion.type,
       }),
     });
 
-    if (!evalResponse.ok) {
-      throw new Error('Failed to evaluate claim');
-    }
+    if (!response.ok) throw new Error('Failed to generate modifications');
 
-    const evalData = await evalResponse.json();
-
-    // Generate modifications
-    const result = await generateModifications(
-      claim.text,
-      evalData.toulminDiagram,
-      modificationType as any
-    );
-
-    console.log('Modification suggestions:', result.suggestions);
-
-    // Store the modification options for this suggestion ID
+    const data = await response.json();
+    
     setModificationOptions(prev => ({
       ...prev,
       [suggestionId]: {
-        suggestions: result.suggestions || [],
-        explanations: result.explanations || [],
-        claim: claim
+        claim,
+        suggestions: data.suggestions,
+        explanations: data.explanations,
       }
     }));
-  } catch (err) {
-    console.error('Failed to generate modifications:', err);
-    alert('Failed to generate suggestions. Please try again.');
+  } catch (error) {
+    console.error('Error generating modifications:', error);
+    alert('Failed to generate modification options. Please try again.');
+    setExpandedSuggestionId(null);
+  } finally {
+    // Remove from loading set
+    setLoadingModifications(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(suggestionId);
+      return newSet;
+    });
   }
 };
 
-  const handleClaimClick = (claimId: string) => {
-    console.log('Claim clicked:', claimId);
+  // const handleClaimClick = (claimId: string) => {
+  //   console.log('Claim clicked:', claimId);
     
-    // Always set highlight (don't toggle)
+  //   // Always set highlight (don't toggle)
+  //   setHighlightedClaimId(claimId);
+    
+  //   // Find and scroll to the suggestion for this claim
+  //   const suggestionForClaim = suggestions.find(s => s.claimId === claimId);
+  //   console.log('Found suggestion:', suggestionForClaim?.id);
+    
+  //   if (suggestionForClaim) {
+  //     const suggestionElement = document.getElementById(`suggestion-${suggestionForClaim.id}`);
+  //     console.log('Found element:', suggestionElement ? 'yes' : 'no');
+      
+  //     if (suggestionElement) {
+  //       suggestionElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  //     }
+  //   }
+  // };
+
+  // const handleClaimClick = (claimId: string) => {
+  //   console.log('=== handleClaimClick ===');
+  //   console.log('Claim ID:', claimId);
+  //   console.log('All claims:', claims.map(c => c.id));
+    
+  //   // Set highlight
+  //   setHighlightedClaimId(claimId);
+    
+  //   // Debug: Check what's actually in the DOM
+  //   setTimeout(() => {
+  //     const allSpans = document.querySelectorAll('[data-claim-id]');
+  //     console.log('Total spans with data-claim-id in DOM:', allSpans.length);
+  //     console.log('Span IDs:', Array.from(allSpans).map(s => s.getAttribute('data-claim-id')));
+      
+  //     const claimSpan = document.querySelector(`[data-claim-id="${claimId}"]`);
+  //     console.log('Found claim span in editor:', claimSpan ? 'YES' : 'NO');
+      
+  //     if (claimSpan) {
+  //       claimSpan.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  //     } else {
+  //       console.warn('Could not find claim span with ID:', claimId);
+  //       // Debug: Let's see what the editor contains
+  //       const editor = document.querySelector('[contenteditable="true"]');
+  //       console.log('Editor innerHTML preview:', editor?.innerHTML.substring(0, 500));
+  //     }
+  //   }, 100);
+  // };
+
+  const handleClaimClick = (claimId: string) => {
+    console.log('=== handleClaimClick ===');
+    console.log('Claim ID:', claimId);
+    
+    // Set highlight
     setHighlightedClaimId(claimId);
     
-    // Find and scroll to the suggestion for this claim
-    const suggestionForClaim = suggestions.find(s => s.claimId === claimId);
-    console.log('Found suggestion:', suggestionForClaim?.id);
-    
-    if (suggestionForClaim) {
-      const suggestionElement = document.getElementById(`suggestion-${suggestionForClaim.id}`);
-      console.log('Found element:', suggestionElement ? 'yes' : 'no');
-      
-      if (suggestionElement) {
-        suggestionElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    // Scroll to the claim text in editor
+    setTimeout(() => {
+      const claimSpan = document.querySelector(`[data-claim-id="${claimId}"]`);
+      if (claimSpan) {
+        claimSpan.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
-    }
+    }, 100);
+    
+    // ALSO scroll to the corresponding suggestion in the panel
+    setTimeout(() => {
+      const suggestionForClaim = suggestions.find(s => s.claimId === claimId);
+      if (suggestionForClaim) {
+        const suggestionElement = document.getElementById(`suggestion-${suggestionForClaim.id}`);
+        console.log('Scrolling to suggestion:', suggestionForClaim.id, suggestionElement ? 'found' : 'not found');
+        
+        if (suggestionElement) {
+          suggestionElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }
+    }, 100);
   };
 
   const handleViewEvidence = (cellId: string) => {
@@ -480,6 +587,7 @@ highlightedClaimId={highlightedClaimId}
   analysisSuggestions={analysisSuggestions}
   modificationOptions={modificationOptions}
   onCloseExpanded={() => setExpandedSuggestionId(null)}
+  loadingModifications={loadingModifications}
   onSelectModification={(suggestionId, modificationIndex) => {
     const options = modificationOptions[suggestionId];
     if (!options) return;

@@ -281,7 +281,7 @@ Evaluate this claim and return JSON with this EXACT structure:
 **MODIFICATION TYPE:** ${modificationType}
 
 **YOUR TASK:**
-Generate 3-5 alternative phrasings for this claim that address the issues.
+Generate 1-3 alternative phrasings for this claim that address the issues.
 
 ${modificationType === 'weaken' ? 'WEAKEN the claim by replacing absolute language with more cautious terms.' : ''}
 ${modificationType === 'caveat' ? 'ADD CAVEATS to acknowledge limitations in the data or analysis.' : ''}

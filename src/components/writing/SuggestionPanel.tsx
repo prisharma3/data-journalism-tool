@@ -25,6 +25,7 @@ interface SuggestionPanelProps {
     onSelectModification: (suggestionId: string, modificationIndex: number) => void;
     onGenerateModification: (suggestionId: string) => void;
     projectId?: string;
+    loadingModifications: Set<string>;
   }
 
 // Storage key for tab state
@@ -51,6 +52,7 @@ export function SuggestionPanel({
     onSelectModification,
     onGenerateModification,
     projectId,
+    loadingModifications,
   }: SuggestionPanelProps) {
 
  // No tab state needed - we only show issues now   
@@ -84,7 +86,7 @@ export function SuggestionPanel({
   };
 
   return (
-    <div className="w-64 border-l border-gray-200 bg-white flex flex-col" style={{ height: '100%' }}>
+    <div className="w-64 border-l border-gray-200 bg-white flex flex-col" style={{ height: '110%' }}>
       {/* Header */}
       <div className="border-b border-gray-200 px-3 py-2.5 bg-gray-50">
         <h3 className="text-xs font-medium text-gray-700">
@@ -161,44 +163,46 @@ export function SuggestionPanel({
                     {suggestion.explanation}
                   </p>
   
-                  {/* Special rendering for add-analysis with suggested query */}
-                  {suggestion.type === 'add-analysis' && suggestion.metadata?.suggestedQuery && (
-                    <div className="mb-3 p-3 bg-white rounded-lg border border-blue-200">
-                      <p className="text-xs font-semibold text-blue-900 mb-2">💡 Suggested Analysis:</p>
-                      <p className="text-sm text-blue-800 font-mono bg-blue-50 p-2 rounded">
-                        {suggestion.metadata.suggestedQuery}
-                      </p>
-                      {suggestion.metadata.missingConcepts && suggestion.metadata.missingConcepts.length > 0 && (
-                        <div className="mt-2">
-                          <p className="text-xs text-gray-600">Missing concepts:</p>
-                          <div className="flex flex-wrap gap-1 mt-1">
-                            {suggestion.metadata.missingConcepts.map((concept, idx) => (
-                              <span key={idx} className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded">
-                                {concept}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
+{/* Special rendering for add-analysis with suggested query
+{suggestion.type === 'add-analysis' && suggestion.metadata?.suggestedQuery && (
+  <div className="mb-3 p-3 bg-white rounded-lg border border-blue-200">
+    <div className="flex items-start gap-2">
+      <span className="text-lg">💡</span>
+      <div className="flex-1">
+        <p className="text-sm text-blue-800 font-mono bg-blue-50 p-2 rounded">
+          {suggestion.metadata.suggestedQuery}
+        </p>
+      </div>
+    </div>
+    {suggestion.metadata.missingConcepts && suggestion.metadata.missingConcepts.length > 0 && (
+      <div className="mt-2">
+        <p className="text-xs text-gray-600">Missing concepts:</p>
+        <div className="flex flex-wrap gap-1 mt-1">
+          {suggestion.metadata.missingConcepts.map((concept, idx) => (
+            <span key={idx} className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded">
+              {concept}
+            </span>
+          ))}
+        </div>
+      </div>
+    )}
+  </div>
+)} */}
   
                   {/* Action Buttons */}
                   <div className="flex gap-2 mt-3">
-                    {suggestion.type === 'add-analysis' && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (suggestion.metadata?.suggestedQuery) {
-                            navigator.clipboard.writeText(suggestion.metadata.suggestedQuery);
-                            alert('Analysis query copied! Paste it in the notebook to run.');
-                          }
-                        }}
-                        className="flex-1 px-3 py-1.5 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 transition-colors"
-                      >
-                        📋 Copy Query
-                      </button>
-                    )}
+                  {suggestion.type === 'add-analysis' && suggestion.metadata?.suggestedQuery && (
+  <button
+    onClick={(e) => {
+      e.stopPropagation();
+      navigator.clipboard.writeText(suggestion.metadata.suggestedQuery);
+      alert('Analysis query copied! Paste it in the notebook to run.');
+    }}
+    className="flex-1 px-3 py-1.5 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 transition-colors"
+  >
+    📋 Copy Query
+  </button>
+)}
                     
                     {(suggestion.type === 'weaken-claim' || suggestion.type === 'add-caveat' || suggestion.type === 'add-qualifier') && (
   <button
@@ -206,9 +210,17 @@ export function SuggestionPanel({
       e.stopPropagation();
       onGenerateModification(suggestion.id);
     }}
-    className="flex-1 px-3 py-1.5 bg-green-600 text-white rounded text-xs hover:bg-green-700 transition-colors"
+    disabled={loadingModifications.has(suggestion.id)}
+    className="flex-1 px-3 py-1.5 bg-green-600 text-white rounded text-xs hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1"
   >
-    ✏️ Fix This Issue
+    {loadingModifications.has(suggestion.id) ? (
+      <>
+        <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
+        <span>Loading...</span>
+      </>
+    ) : (
+      <>✏️ Fix This Issue</>
+    )}
   </button>
 )}
                   </div>
