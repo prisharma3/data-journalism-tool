@@ -179,10 +179,9 @@ const getUnderlineStyle = (claim: ClaimStructure): string => {
           const underlineClass = getUnderlineClass(segment.claim);
           const tooltip = getTooltip(segment.claim);
           const highlightClass = isHighlighted ? 'bg-yellow-100 ring-2 ring-yellow-400' : '';
-          
-          const inlineStyle = getUnderlineStyle(segment.claim);
-          return `<span data-claim-id="${segment.claim.id}" class="cursor-pointer hover:bg-gray-100 transition-colors ${highlightClass}" style="${inlineStyle} text-underline-offset: 4px;" title="${tooltip.replace(/"/g, '&quot;')}">${segment.text}</span>`;
 
+          const claimUnderlineClass = getUnderlineClass(segment.claim);
+return `<span data-claim-id="${segment.claim.id}" class="underline underline-offset-4 ${claimUnderlineClass} cursor-pointer hover:bg-gray-100 transition-colors ${highlightClass}" title="${tooltip.replace(/"/g, '&quot;')}">${segment.text}</span>`;
         }
         return segment.text;
       }).join('');

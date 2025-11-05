@@ -213,7 +213,42 @@ export function SuggestionPanel({
 )}
                   </div>
   
-                  {/* Expanded sections can be added here if needed */}
+                  {/* Modification Options - Show when expanded */}
+                  {expandedSuggestionId === suggestion.id && modificationOptions[suggestion.id] && (
+                    <div className="mt-3 p-3 bg-white border border-gray-200 rounded">
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-xs font-semibold text-gray-700">Suggested Modifications:</p>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onCloseExpanded();
+                          }}
+                          className="text-gray-400 hover:text-gray-600"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                      <div className="space-y-2">
+                        {modificationOptions[suggestion.id].suggestions.map((modSuggestion: string, index: number) => (
+                          <div
+                            key={index}
+                            className="p-2 bg-gray-50 rounded border border-gray-200 hover:bg-gray-100 transition-colors cursor-pointer"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onSelectModification(suggestion.id, index);
+                            }}
+                          >
+                            <p className="text-sm text-gray-900 mb-1">{modSuggestion}</p>
+                            {/* {modificationOptions[suggestion.id].explanations[index] && (
+                              <p className="text-xs text-gray-600">
+                                {modificationOptions[suggestion.id].explanations[index]}
+                              </p>
+                            )} */}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))
           )}

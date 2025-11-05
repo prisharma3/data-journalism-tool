@@ -469,7 +469,7 @@ useEffect(() => {
         >
           <div className="flex items-center gap-3">
             <span className="text-sm">{shouldCollapseCode ? '▶' : '▼'}</span>
-            <span className="text-sm font-medium text-gray-700">💻 Python Code</span>
+            <span className="text-sm font-medium text-gray-700"> Code</span>
             {cell.executionCount && (
               <span className="text-xs text-gray-500 font-mono">[{cell.executionCount}]</span>
             )}
@@ -569,8 +569,8 @@ useEffect(() => {
       }}
     >
       <div className="flex items-center gap-2">
-        <span className="text-sm">{isOutputCollapsed ? '▶️' : '▼'}</span>
-        <span className="text-sm font-semibold text-gray-700">📊 Output</span>
+        <span className="text-sm">{isOutputCollapsed ? '▶' : '▼'}</span>
+        <span className="text-sm font-semibold text-gray-700">Output</span>
         {cell.output?.executionTime && (
           <span className="text-xs text-gray-500">
             ({cell.output.executionTime}ms)
