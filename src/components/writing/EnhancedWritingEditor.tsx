@@ -353,82 +353,44 @@ const handleGenerateModification = async (suggestionId: string) => {
   }
 };
 
-  // const handleClaimClick = (claimId: string) => {
-  //   console.log('Claim clicked:', claimId);
-    
-  //   // Always set highlight (don't toggle)
-  //   setHighlightedClaimId(claimId);
-    
-  //   // Find and scroll to the suggestion for this claim
-  //   const suggestionForClaim = suggestions.find(s => s.claimId === claimId);
-  //   console.log('Found suggestion:', suggestionForClaim?.id);
-    
-  //   if (suggestionForClaim) {
-  //     const suggestionElement = document.getElementById(`suggestion-${suggestionForClaim.id}`);
-  //     console.log('Found element:', suggestionElement ? 'yes' : 'no');
+// Handle clicking claim text in editor - should scroll to suggestion panel
+const handleClaimTextClick = (claimId: string) => {
+  console.log('=== Claim text clicked ===');
+  console.log('Claim ID:', claimId);
+  
+  // Set highlight
+  setHighlightedClaimId(claimId);
+  
+  // Scroll to the corresponding suggestion in the panel
+  setTimeout(() => {
+    const suggestionForClaim = suggestions.find(s => s.claimId === claimId);
+    if (suggestionForClaim) {
+      const suggestionElement = document.getElementById(`suggestion-${suggestionForClaim.id}`);
+      console.log('Scrolling to suggestion:', suggestionForClaim.id, suggestionElement ? 'found' : 'not found');
       
-  //     if (suggestionElement) {
-  //       suggestionElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  //     }
-  //   }
-  // };
-
-  // const handleClaimClick = (claimId: string) => {
-  //   console.log('=== handleClaimClick ===');
-  //   console.log('Claim ID:', claimId);
-  //   console.log('All claims:', claims.map(c => c.id));
-    
-  //   // Set highlight
-  //   setHighlightedClaimId(claimId);
-    
-  //   // Debug: Check what's actually in the DOM
-  //   setTimeout(() => {
-  //     const allSpans = document.querySelectorAll('[data-claim-id]');
-  //     console.log('Total spans with data-claim-id in DOM:', allSpans.length);
-  //     console.log('Span IDs:', Array.from(allSpans).map(s => s.getAttribute('data-claim-id')));
-      
-  //     const claimSpan = document.querySelector(`[data-claim-id="${claimId}"]`);
-  //     console.log('Found claim span in editor:', claimSpan ? 'YES' : 'NO');
-      
-  //     if (claimSpan) {
-  //       claimSpan.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  //     } else {
-  //       console.warn('Could not find claim span with ID:', claimId);
-  //       // Debug: Let's see what the editor contains
-  //       const editor = document.querySelector('[contenteditable="true"]');
-  //       console.log('Editor innerHTML preview:', editor?.innerHTML.substring(0, 500));
-  //     }
-  //   }, 100);
-  // };
-
-  const handleClaimClick = (claimId: string) => {
-    console.log('=== handleClaimClick ===');
-    console.log('Claim ID:', claimId);
-    
-    // Set highlight
-    setHighlightedClaimId(claimId);
-    
-    // Scroll to the claim text in editor
-    setTimeout(() => {
-      const claimSpan = document.querySelector(`[data-claim-id="${claimId}"]`);
-      if (claimSpan) {
-        claimSpan.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      if (suggestionElement) {
+        suggestionElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
-    }, 100);
-    
-    // ALSO scroll to the corresponding suggestion in the panel
-    setTimeout(() => {
-      const suggestionForClaim = suggestions.find(s => s.claimId === claimId);
-      if (suggestionForClaim) {
-        const suggestionElement = document.getElementById(`suggestion-${suggestionForClaim.id}`);
-        console.log('Scrolling to suggestion:', suggestionForClaim.id, suggestionElement ? 'found' : 'not found');
-        
-        if (suggestionElement) {
-          suggestionElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
-      }
-    }, 100);
-  };
+    }
+  }, 100);
+};
+
+// Handle clicking suggestion in panel - should scroll to claim text
+const handleSuggestionClick = (claimId: string) => {
+  console.log('=== Suggestion clicked ===');
+  console.log('Claim ID:', claimId);
+  
+  // Set highlight
+  setHighlightedClaimId(claimId);
+  
+  // Scroll to the claim text in editor
+  setTimeout(() => {
+    const claimSpan = document.querySelector(`[data-claim-id="${claimId}"]`);
+    if (claimSpan) {
+      claimSpan.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, 100);
+};
 
   const handleViewEvidence = (cellId: string) => {
     // Dispatch custom event to highlight and scroll to the cell in notebook
@@ -526,11 +488,11 @@ const handleGenerateModification = async (suggestionId: string) => {
   </div>
 )}
 
-          <TextWithClaims
+<TextWithClaims
   text={content}
   claims={claims}
   suggestions={suggestions}
-  onClaimClick={handleClaimClick}
+  onClaimClick={handleClaimTextClick}
   highlightedClaimId={highlightedClaimId}
   onContentChange={(newText, newCursor) => {
     handleContentChange(newText, newCursor);
@@ -548,11 +510,10 @@ const handleGenerateModification = async (suggestionId: string) => {
         )}
       </div>
 
-{/* Suggestion Panel */}
-<SuggestionPanel
+      <SuggestionPanel
 projectId={projectId}
-onSuggestionClick={handleClaimClick}  
-highlightedClaimId={highlightedClaimId} 
+onSuggestionClick={handleSuggestionClick}  
+highlightedClaimId={highlightedClaimId}
   suggestions={suggestions.filter(s => {
     // Filter out dismissed suggestions
     if (dismissedSuggestions.has(s.id)) return false;

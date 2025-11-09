@@ -428,29 +428,39 @@ useEffect(() => {
 //   }
 // }, [isEditable, segments, suggestions]); // Add suggestions to deps so colors update
 
-// Editable view - initialize content only on first mount or when text changes externally
+// Initialize editor content on first render and when text/segments change
 useEffect(() => {
   if (!isEditable || !editorRef.current) return;
   
   const currentText = editorRef.current.innerText;
   
-  // Only update if this is first render or text changed from external source
-  if (currentText === '' || (text !== currentText && text !== lastRenderedTextRef.current)) {
+  // ALWAYS update if empty, OR if text changed externally, OR if segments changed
+  const shouldUpdate = 
+    currentText === '' || 
+    (text !== currentText && text !== lastRenderedTextRef.current) ||
+    editorRef.current.querySelectorAll('[data-claim-id]').length !== claims.length;
+  
+  if (shouldUpdate) {
+    console.log('🔄 Initializing editor with', claims.length, 'claims');
     lastRenderedTextRef.current = text;
     
-    // Update the HTML with claim spans
+    // Build HTML with underlined claim spans
     editorRef.current.innerHTML = segments.map((segment) => {
       if (segment.claim) {
         const underlineStyle = getUnderlineStyle(segment.claim);
         const tooltip = getTooltip(segment.claim);
-        return `<span data-claim-id="${segment.claim.id}" style="${underlineStyle}" class="cursor-pointer hover:bg-gray-100 transition-colors" title="${tooltip.replace(/"/g, '&quot;')}">${segment.text}</span>`;
+        const highlightClass = highlightedClaimId === segment.claim.id 
+          ? 'bg-yellow-100 ring-2 ring-yellow-400' 
+          : '';
+        
+        return `<span data-claim-id="${segment.claim.id}" style="${underlineStyle}" class="cursor-pointer hover:bg-gray-100 transition-colors ${highlightClass}" title="${tooltip.replace(/"/g, '&quot;')}">${segment.text}</span>`;
       }
       return segment.text;
     }).join('');
   }
-}, [isEditable, text]); // Only depend on text, not segments or suggestions
+}, [isEditable, text, segments, claims.length, highlightedClaimId]);
 
-// Update underline colors when suggestions change, without resetting content
+// Update underline colors when suggestions change
 useEffect(() => {
   if (!isEditable || !editorRef.current) return;
   
@@ -467,17 +477,17 @@ useEffect(() => {
 
 // Update highlighting when highlightedClaimId changes
 useEffect(() => {
-  if (isEditable && editorRef.current && highlightedClaimId) {
-    const allSpans = editorRef.current.querySelectorAll('[data-claim-id]');
-    allSpans.forEach((span) => {
-      const claimId = span.getAttribute('data-claim-id');
-      if (claimId === highlightedClaimId) {
-        (span as HTMLElement).classList.add('bg-yellow-100', 'ring-2', 'ring-yellow-400');
-      } else {
-        (span as HTMLElement).classList.remove('bg-yellow-100', 'ring-2', 'ring-yellow-400');
-      }
-    });
-  }
+  if (!isEditable || !editorRef.current) return;
+  
+  const allSpans = editorRef.current.querySelectorAll('[data-claim-id]');
+  allSpans.forEach((span) => {
+    const claimId = span.getAttribute('data-claim-id');
+    if (claimId === highlightedClaimId) {
+      (span as HTMLElement).classList.add('bg-yellow-100', 'ring-2', 'ring-yellow-400');
+    } else {
+      (span as HTMLElement).classList.remove('bg-yellow-100', 'ring-2', 'ring-yellow-400');
+    }
+  });
 }, [isEditable, highlightedClaimId]);
 
 // Editable view
