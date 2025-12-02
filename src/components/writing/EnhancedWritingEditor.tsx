@@ -353,15 +353,22 @@ const handleGenerateModification = async (suggestionId: string) => {
   }
 };
 
-// Handle clicking claim text in editor - should scroll to suggestion panel
-const handleClaimTextClick = (claimId: string) => {
-  console.log('=== Claim text clicked ===');
+const handleClaimClick = (claimId: string) => {
+  console.log('=== handleClaimClick ===');
   console.log('Claim ID:', claimId);
   
   // Set highlight
   setHighlightedClaimId(claimId);
   
-  // Scroll to the corresponding suggestion in the panel
+  // Scroll to the claim text in editor
+  setTimeout(() => {
+    const claimSpan = document.querySelector(`[data-claim-id="${claimId}"]`);
+    if (claimSpan) {
+      claimSpan.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, 100);
+  
+  // ALSO scroll to the corresponding suggestion in the panel
   setTimeout(() => {
     const suggestionForClaim = suggestions.find(s => s.claimId === claimId);
     if (suggestionForClaim) {
@@ -429,7 +436,7 @@ const handleSuggestionClick = (claimId: string) => {
             </label>
           </div>
 
-          {/* Status indicators */}
+          {/* Status indicators
           <div className="flex items-center gap-3 ml-auto text-xs text-gray-500">
             {isDetecting && (
               <span className="flex items-center gap-1">
@@ -453,7 +460,35 @@ const handleSuggestionClick = (claimId: string) => {
                 {suggestions.length} issues
               </span>
             )}
-          </div>
+          </div> */}
+          {/* Status indicators */}
+<div className="flex items-center gap-3 ml-auto text-xs text-gray-500">
+  {isDetecting && (
+    <span className="flex items-center gap-1">
+      <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600"></div>
+      Detecting...
+    </span>
+  )}
+  {isEvaluating && (
+    <span className="flex items-center gap-1">
+      <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-orange-600"></div>
+      Evaluating...
+    </span>
+  )}
+  {claims.length > 0 && (
+    <span className="px-2 py-1 rounded bg-blue-100 text-blue-800">
+      {claims.length} claims
+    </span>
+  )}
+  {(() => {
+    const activeIssuesCount = suggestions.filter(s => !dismissedSuggestions.has(s.id)).length;
+    return activeIssuesCount > 0 ? (
+      <span className="px-2 py-1 rounded bg-orange-100 text-orange-800">
+        {activeIssuesCount} issues
+      </span>
+    ) : null;
+  })()}
+</div>
         </div>
 
 {/* Editor - Single editable view with inline claim highlights */}
@@ -492,12 +527,13 @@ const handleSuggestionClick = (claimId: string) => {
   text={content}
   claims={claims}
   suggestions={suggestions}
-  onClaimClick={handleClaimTextClick}
+  onClaimClick={handleClaimClick}
   highlightedClaimId={highlightedClaimId}
   onContentChange={(newText, newCursor) => {
     handleContentChange(newText, newCursor);
   }}
   isEditable={true}
+  isEvaluating={isEvaluating}
 />
           </div>
         </div>

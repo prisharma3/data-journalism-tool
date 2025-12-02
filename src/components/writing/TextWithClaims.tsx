@@ -15,6 +15,7 @@ interface TextWithClaimsProps {
   highlightedClaimId?: string | null; 
   onContentChange?: (newText: string, cursorPosition: number) => void;
   isEditable?: boolean;
+  isEvaluating?: boolean;
 }
 
 export function TextWithClaims({
@@ -25,6 +26,7 @@ export function TextWithClaims({
   highlightedClaimId,
   onContentChange,
   isEditable = false,
+  isEvaluating = false,
 }: TextWithClaimsProps) {
   const editorRef = useRef<HTMLDivElement>(null);
   const isComposingRef = useRef(false);
@@ -94,12 +96,17 @@ export function TextWithClaims({
   };
 
   // Add this new function after the getTooltip function (around line 90)
-const getUnderlineStyle = (claim: ClaimStructure): string => {
-  const claimSuggestions = suggestions.filter(s => s.claimId === claim.id);
-  
-  if (claimSuggestions.length === 0) {
-    return 'text-decoration: underline; text-decoration-color: rgb(34, 197, 94); text-decoration-thickness: 2px; text-decoration-style: solid;';
-  }
+  const getUnderlineStyle = (claim: ClaimStructure): string => {
+    const claimSuggestions = suggestions.filter(s => s.claimId === claim.id);
+    
+    // Show gray/neutral color while evaluating
+    if (isEvaluating) {
+      return 'text-decoration: underline; text-decoration-color: rgb(156, 163, 175); text-decoration-thickness: 2px; text-decoration-style: dotted;';
+    }
+    
+    if (claimSuggestions.length === 0) {
+      return 'text-decoration: underline; text-decoration-color: rgb(34, 197, 94); text-decoration-thickness: 2px; text-decoration-style: solid;';
+    }
 
   const topSuggestion = claimSuggestions.sort((a, b) => b.priority - a.priority)[0];
 

@@ -243,18 +243,18 @@ const handleEditInsight = (aiInsight: any, index: number) => {
 };
 
 // Auto-generate insights when output changes
-useEffect(() => {
-  if (cell.output && !cell.error && !isGeneratingInsights) {
-    // Check if we already have insights for this output
-    const hasInsightsForThisOutput = cellInsights && cellInsights.length > 0;
+// useEffect(() => {
+//   if (cell.output && !cell.error && !isGeneratingInsights) {
+//     // Check if we already have insights for this output
+//     const hasInsightsForThisOutput = cellInsights && cellInsights.length > 0;
     
-    // Only auto-generate if no insights exist yet
-    if (!hasInsightsForThisOutput) {
-      handleGenerateInsights();
-    }
-  }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-}, [cell.output]); // Trigger when output changes
+//     // Only auto-generate if no insights exist yet
+//     if (!hasInsightsForThisOutput) {
+//       handleGenerateInsights();
+//     }
+//   }
+//   // eslint-disable-next-line react-hooks/exhaustive-deps
+// }, [cell.output]); // Trigger when output changes
 
 // // Listen for AI insight removal after successful modal save
 // useEffect(() => {
@@ -624,8 +624,24 @@ useEffect(() => {
       )}
     </div>
     
+{/* Insight Action Buttons */}
+{cell.output && !cell.error && !isGeneratingInsights && (
+  <div className="flex items-center gap-2">
+    {/* AI Help Button - Generate Insights */}
+    <button
+      onClick={(e) => {
+        e.stopPropagation();
+        handleGenerateInsights();
+      }}
+      className="text-xs px-3 py-1 border border-purple-300 text-purple-600 rounded hover:bg-purple-50 transition-all flex items-center gap-1"
+      title="Generate AI insights for this output"
+    >
+      <Sparkles size={14} />
+      AI Help
+    </button>
+    
     {/* Manual Add Insight Button */}
-    {cell.output && !cell.error && onAddInsight && !isGeneratingInsights && (
+    {onAddInsight && (
       <button
         onClick={(e) => {
           e.stopPropagation();
@@ -637,6 +653,8 @@ useEffect(() => {
         Add Manually
       </button>
     )}
+  </div>
+)}
   </div>
 
 {/* Loading indicator for AI insights generation */}

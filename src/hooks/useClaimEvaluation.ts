@@ -91,6 +91,34 @@ const evaluateClaims = useCallback(async (claimsToEvaluate: ClaimStructure[]) =>
   /**
    * Detect claims in text
    */
+  // const detectClaims = useCallback(async () => {
+  //   console.log('🔍 detectClaims called:', { 
+  //       enabled, 
+  //       textLength: text?.length, 
+  //       lastTextLength: lastTextRef.current?.length,
+  //       sameAsLast: text === lastTextRef.current 
+  //     });
+      
+  //     if (!enabled) {
+  //       console.log('❌ Detection disabled');
+  //       return;
+  //     }
+      
+  //     if (!text || text.trim().length === 0) {
+  //       console.log('❌ No text');
+  //       return;
+  //     }
+      
+  //     if (text === lastTextRef.current) {
+  //       console.log('❌ Same text as last');
+  //       return;
+  //     }
+      
+  //     console.log('✅ Starting claim detection...');
+    
+  //   setIsDetecting(true);
+  //   setError(null);
+  //   lastTextRef.current = text;
   const detectClaims = useCallback(async () => {
     console.log('🔍 detectClaims called:', { 
         enabled, 
@@ -115,6 +143,10 @@ const evaluateClaims = useCallback(async (claimsToEvaluate: ClaimStructure[]) =>
       }
       
       console.log('✅ Starting claim detection...');
+    
+    // CLEAR old claims and suggestions immediately when starting new detection
+    setClaims([]);
+    setSuggestions([]);
     
     setIsDetecting(true);
     setError(null);
