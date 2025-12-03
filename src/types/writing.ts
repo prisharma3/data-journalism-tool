@@ -53,7 +53,6 @@ export interface ClaimStructure {
     rebuttal: Rebuttal[];
     
     strength: ArgumentStrength;
-    overallScore: number;
     issues: ArgumentIssue[];
     gaps: EvidenceGap[];
     

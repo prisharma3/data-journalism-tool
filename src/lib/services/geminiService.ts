@@ -102,151 +102,6 @@ private parseGeminiJSON(response: string): any {
     return this.parseGeminiJSON(response);
   }
   
-  /**
-   * Build evaluation prompt for Gemini
-   */
-//   private buildEvaluationPrompt(claim: ClaimStructure, notebookContext: any): string {
-//     return `You are an expert research analyst evaluating substantive claims using the Toulmin argumentation framework.
-
-// **CLAIM TO EVALUATE:**
-// "${claim.text}"
-
-// **CLAIM TYPE:** ${claim.type}
-
-// **CRITICAL - FIRST CHECK IF THIS IS EVEN A CLAIM:**
-
-// DO NOT EVALUATE if the text is:
-// - Headings or section titles: "Introduction", "Methods", "Results", "Conclusion", "Discussion", "Background"
-// - Transitional phrases: "In this section", "As we will see", "Next, we examine", "This paper"
-// - Meta-commentary: "We will show", "This analysis demonstrates", "Our approach"
-// - Questions or hypotheses: "Does X cause Y?", "We hypothesize that"
-// - Methodological descriptions: "We used", "The data was collected"
-
-// IF THE TEXT ABOVE IS ANY OF THESE, return this EXACT JSON:
-// {
-//   "recommendedAction": "claim-is-fine",
-//   "actionReasoning": "Not a substantive claim",
-//   "grounds": [],
-//   "warrant": {"statement": "", "type": "logical", "confidence": 0, "acceptanceLevel": "widely-accepted"},
-//   "overallScore": 0,
-//   "strength": "unsupported",
-//   "issues": [],
-//   "gaps": [],
-//   "qualifier": {"detected": [], "missing": [], "appropriatenessScore": 0},
-//   "modificationPaths": {"weaken": "", "caveat": "", "reverse": ""}
-// }
-
-// **ONLY IF THIS IS A SUBSTANTIVE RESEARCH CLAIM, CONTINUE BELOW:**
-
-// **DECISION TREE - YOU MUST CLASSIFY THIS CLAIM INTO ONE OF THREE CATEGORIES:**
-
-// 1. **"claim-is-fine"**: Claim is well-supported by existing evidence, no changes needed
-//    - Use when: Strong grounds + strong warrant + evidence exists in notebook
-   
-// 2. **"claim-needs-change"**: Claim must be modified (evidence exists but claim is too strong/weak)
-//    - Use when: Evidence exists BUT claim language doesn't match evidence strength
-//    - Offer: weaken, caveat, or remove options
-   
-// 3. **"claim-might-need-change"**: Not enough evidence to evaluate properly
-//    - Use when: Missing evidence OR insufficient analysis in notebook
-//    - Must suggest: what specific analysis would help evaluate this claim
-
-// **NOTEBOOK CONTEXT:**
-
-// Hypotheses:
-// ${notebookContext.hypotheses?.map((h: any) => `- ${h.content}`).join('\n') || 'None'}
-
-// Analyses:
-// ${notebookContext.cells?.map((c: any) => `
-// Analysis: ${c.query}
-// Output: ${c.output?.text || 'No output'}
-// `).join('\n') || 'None'}
-
-// Insights:
-// ${notebookContext.insights?.map((i: any) => `- ${i.content}`).join('\n') || 'None'}
-
-// **EVALUATION GUIDELINES:**
-
-// STRATEGIC ISSUE DETECTION:
-// - Return MAXIMUM 1-3 issues per claim - only the most critical problems
-// - Critical severity: ONLY for claims with zero supporting evidence or fundamental logical flaws
-// - Warning severity: For claims with weak/incomplete evidence or missing qualifiers
-// - Info severity: For minor improvements or style suggestions
-// - If the claim is reasonably well-supported, return ZERO issues
-
-// **YOUR TASK:**
-// Evaluate this claim and return JSON with this EXACT structure:
-
-// {
-//   "recommendedAction": "claim-is-fine" OR "claim-needs-change" OR "claim-might-need-change",
-//   "actionReasoning": "one sentence explaining why you chose this action",
-//   "grounds": [
-//     {
-//       "content": "specific evidence text from notebook",
-//       "sourceType": "insight" or "cell_output",
-//       "relevanceScore": 0.0-1.0,
-//       "strengthScore": 0.0-1.0
-//     }
-//   ],
-//   "warrant": {
-//     "statement": "one sentence explaining logical link between evidence and claim",
-//     "type": "causal" or "statistical" or "comparative" or "logical",
-//     "confidence": 0.0-1.0,
-//     "acceptanceLevel": "widely-accepted" or "domain-specific" or "controversial"
-//   },
-//   "overallScore": 0-100,
-//   "strength": "strong" or "moderate" or "weak" or "unsupported",
-//   "issues": [
-//     {
-//       "type": "no-evidence" or "weak-evidence" or "overclaim" or "missing-qualifier" or "causation-correlation",
-//       "severity": "critical" or "warning" or "info",
-//       "message": "short description (max 10 words)",
-//       "explanation": "detailed explanation (2-3 sentences)"
-//     }
-//   ],
-//   "gaps": [
-//     {
-//       "type": "missing-variable" or "missing-relationship" or "fundamentally-unsupportable",
-//       "description": "what analysis is missing OR why claim cannot be supported",
-//       "missingConcepts": ["concept1"],
-//       "importance": "critical" or "important" or "optional",
-//       "suggestedQuery": "SPECIFIC natural language query OR null if claim is fundamentally unsupportable"
-//     }
-//   ],
-//   "qualifier": {
-//     "detected": ["existing qualifier words"],
-//     "missing": ["if needed, suggest qualifiers like 'some', 'many', 'likely'"],
-//     "appropriatenessScore": 0.0-1.0
-//   },
-//   "modificationPaths": {
-//     "weaken": "if choosing to weaken, what qualifier words to add",
-//     "caveat": "if choosing to caveat, what limitation to acknowledge",
-//     "reverse": "if choosing to remove/reverse, why evidence is insufficient"
-//   }
-// }
-  
-// **CRITICAL DECISION RULES:**
-// - If overallScore >= 70 AND strength = "strong" → "claim-is-fine"
-// - If overallScore 40-69 AND evidence exists → "claim-needs-change"
-// - If overallScore < 40 OR gaps.importance = "critical" → "claim-might-need-change"
-
-// **FOR "claim-might-need-change" - DETERMINE IF FUNDAMENTALLY UNSUPPORTABLE:**
-// - If the claim requires data/variables that don't exist in the dataset → type: "fundamentally-unsupportable", suggestedQuery: null
-// - If the claim contradicts known facts/methodology → type: "fundamentally-unsupportable", suggestedQuery: null
-// - If analysis COULD help → provide specific suggestedQuery
-
-// **Examples:**
-// - Claim: "Higher altitude causes lower obesity rates" in a dataset with no altitude data → fundamentally-unsupportable
-// - Claim: "X causes Y" but study is correlational not experimental → fundamentally-unsupportable (methodology)
-// - Claim: "Income affects health" but no health variables exist → fundamentally-unsupportable
-// - Claim: "X correlates with Y" but no analysis done yet → SUPPORTABLE, suggest "calculate correlation between X and Y"
-
-// **IMPORTANT:**
-// - Return ONLY valid JSON, no other text
-// - Be decisive - pick ONE recommendedAction
-// - If structural text, return empty arrays and "claim-is-fine"`;
-//   }
-  
 private buildEvaluationPrompt(claim: ClaimStructure, notebookContext: any): string {
   return `You are a data journalism editor evaluating claims before publication.
 
@@ -442,10 +297,32 @@ ${notebookContext.insights?.map((i: any) => `- ${i.content}`).join('\n') || 'Non
   }
 }
 
-**RULES:**
-- Maximum 3 issues per claim
-- Every issue needs a complete suggestedFix
-- toulminAnalysis is for internal reasoning - issues are for user
+**CRITICAL RULES - QUALITY OVER QUANTITY:**
+
+1. ISSUE LIMITS:
+   - Return MAXIMUM 1 issue per claim (only the single most important problem)
+   - If claim is fine, return ZERO issues
+   - Never return generic messages - every issue must be specific to THIS claim
+
+2. MESSAGE QUALITY:
+   - NEVER use generic messages like "This claim cannot be supported with available data"
+   - Each message must reference the SPECIFIC problem (e.g., "No correlation data found for sepal width vs petal length")
+   - Each explanation must cite SPECIFIC evidence from notebook or explain EXACTLY what's missing
+
+3. WHEN TO RETURN ZERO ISSUES:
+   - Claim is descriptive and matches data (e.g., "The dataset contains 150 samples")
+   - Claim has appropriate qualifiers ("suggests", "may", "in this sample")
+   - Evidence exists in notebook that supports the claim
+
+4. FUNDAMENTALLY UNSUPPORTABLE - BE SPECIFIC:
+   - Don't just say "cannot be supported" - explain WHY
+   - Good: "The iris dataset contains no psychological variables, so personality predictions are impossible"
+   - Bad: "This claim cannot be supported with available data"
+
+5. GAPS MUST BE ACTIONABLE:
+   - Only suggest analyses the user can actually run with their data
+   - suggestedQuery must be a real, executable query
+   - If no useful analysis is possible, set canBeResolved: false and explain why
 - Return ONLY valid JSON`;
 }
 
@@ -476,7 +353,6 @@ ${notebookContext.insights?.map((i: any) => `- ${i.content}`).join('\n') || 'Non
 "${claimText}"
 
 **EVALUATION:**
-- Overall Score: ${evaluation.overallScore}/100
 - Strength: ${evaluation.strength}
 - Issues: ${evaluation.issues?.map((i: any) => i.message).join(', ') || 'None'}
 

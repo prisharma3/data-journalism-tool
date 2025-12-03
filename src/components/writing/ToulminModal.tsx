@@ -99,28 +99,10 @@ export function ToulminModal({
                     {evaluation.strength}
                   </span>
                 </div>
-                
-                {/* Score bar */}
-                <div className="mb-2">
-                  <div className="flex justify-between text-xs text-gray-600 mb-1">
-                    <span>Score</span>
-                    <span>{evaluation.overallScore}/100</span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div 
-                      className={`h-2 rounded-full transition-all ${
-                        evaluation.overallScore >= 70 ? 'bg-green-500' :
-                        evaluation.overallScore >= 40 ? 'bg-yellow-500' :
-                        'bg-red-500'
-                      }`}
-                      style={{ width: `${evaluation.overallScore}%` }}
-                    />
-                  </div>
-                </div>
 
                 {/* Evidence count */}
                 {evaluation.grounds && evaluation.grounds.length > 0 && (
-                  <div className="flex items-center gap-2 text-sm text-gray-600 mt-3">
+                  <div className="flex items-center gap-2 text-sm text-gray-600">
                     <CheckCircle className="w-4 h-4 text-green-600" />
                     <span>{evaluation.grounds.length} piece{evaluation.grounds.length !== 1 ? 's' : ''} of supporting evidence found</span>
                   </div>
