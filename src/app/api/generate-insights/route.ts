@@ -19,13 +19,68 @@ export async function POST(request: NextRequest) {
     // Build the prompt
     const prompt = buildInsightGenerationPrompt(cell, dataset, hypotheses, allCells, tags);
 
-    // Call Gemini API
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-pro' });
+// Call Gemini API
+const genAI = new GoogleGenerativeAI(apiKey);
+const model = genAI.getGenerativeModel({ model: 'gemini-2.5-pro' });
 
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const generatedText = response.text();
+// Check if we have a plot image to analyze
+const hasPlot = !!cell.output?.plot;
+const textOutput = cell.output?.text || '';
+const isMinimalTextOutput = textOutput.length < 100 || 
+  textOutput.toLowerCase().includes('successfully generated') ||
+  textOutput.toLowerCase().includes('plot created') ||
+  textOutput.toLowerCase().includes('chart created');
+
+let result;
+
+if (hasPlot && isMinimalTextOutput && cell.output.plot) {
+  // Send image to Gemini for vision analysis
+  try {
+    // Handle base64 image data
+    let imageData = cell.output.plot;
+    let mimeType = 'image/png';
+    
+    // Check if it's a data URL and extract the base64 part
+    if (imageData.startsWith('data:')) {
+      const matches = imageData.match(/^data:([^;]+);base64,(.+)$/);
+      if (matches) {
+        mimeType = matches[1];
+        imageData = matches[2];
+      }
+    }
+    
+    // Create content with both text prompt and image
+    const imagePart = {
+      inlineData: {
+        data: imageData,
+        mimeType: mimeType,
+      },
+    };
+    
+    const imagePrompt = prompt + `
+
+**IMPORTANT: A visualization/plot is attached. Please analyze the ACTUAL image to extract insights.**
+Look for:
+- Patterns, trends, clusters in the data
+- Relationships between variables (correlation direction and strength)
+- Outliers or anomalies
+- Distribution characteristics
+- Group differences (if colored by category)
+
+Describe SPECIFIC observations from the plot with approximate values where visible.`;
+
+    result = await model.generateContent([imagePrompt, imagePart]);
+  } catch (imageError) {
+    console.error('Error processing image, falling back to text-only:', imageError);
+    result = await model.generateContent(prompt);
+  }
+} else {
+  // Text-only analysis
+  result = await model.generateContent(prompt);
+}
+
+const response = await result.response;
+const generatedText = response.text();
 
     // Parse insights
     const insights = parseInsightsFromResponse(generatedText, hypotheses);
@@ -43,95 +98,6 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-
-// function buildInsightGenerationPrompt(
-//     cell: any,
-//     dataset?: any,
-//     hypotheses?: any[],
-//     allCells?: any[],
-//     tags?: any[]
-//   ): string {
-//   const contextParts = [];
-
-//   // Dataset context
-//   if (dataset?.summary) {
-//     contextParts.push(`DATASET CONTEXT:
-// - Filename: ${dataset.filename}
-// - Rows: ${dataset.summary.rows}
-// - Columns: ${dataset.summary.columnNames.join(', ')}
-// `);
-//   }
-
-//   // Research hypotheses context
-//   if (hypotheses && hypotheses.length > 0) {
-//     contextParts.push(`RESEARCH HYPOTHESES:
-// ${hypotheses.map((h: any, i: number) => `H${i + 1}: ${h.content}`).join('\n')}
-// `);
-//   }
-
-//   // Previous analyses context
-//   if (allCells && allCells.length > 0) {
-//     const recentAnalyses = allCells
-//       .filter((c: any) => c.output && !c.error)
-//       .slice(-3)
-//       .map((c: any) => `- Query: ${c.query}\n  Result: ${c.output?.text?.substring(0, 150)}...`)
-//       .join('\n');
-    
-//     if (recentAnalyses) {
-//       contextParts.push(`PREVIOUS ANALYSES:
-// ${recentAnalyses}
-// `);
-//     }
-//   }
-
-//   // Current analysis
-//   contextParts.push(`CURRENT ANALYSIS:
-// Query: ${cell.query}
-// Code: ${cell.content}
-
-// Output:
-// ${cell.output?.text || 'No text output'}
-// ${cell.output?.plot ? '\n[Contains visualization/plot]' : ''}
-// `);
-
-//   const fullContext = contextParts.join('\n---\n');
-
-//   // Add existing tags information
-//   const existingTagsInfo = tags && tags.length > 0 
-//     ? `\n\nEXISTING TAGS IN PROJECT:\n${tags.map((t: any) => `- ${t.name}`).join('\n')}\n\nIMPORTANT: First check if any existing tags are appropriate before suggesting a new tag. Only suggest a new tag if none of the existing tags fit well.`
-//     : '';
-
-//   return `You are a data analysis expert helping a researcher extract meaningful insights from their analysis results.
-
-//   ${fullContext}
-  
-//   Based on the analysis above, generate 1-3 high-quality insights that:
-//   1. Directly interpret the results in clear, accessible language
-//   2. Connect findings to the research hypotheses (if relevant)
-//   3. Highlight important patterns, trends, or statistical findings
-//   4. Are actionable and meaningful for the research
-  
-//   For EACH insight, also suggest ONE alternative or follow-up analysis that would provide additional context or validation.
-  
-//   Return your response as a JSON array with this structure:
-//   [
-// {
-//   "content": "The main insight text here",
-// "suggestedTag": "Pattern" or "Trend" or "Finding" or "Correlation" (ALWAYS capitalize the first letter of tags),
-//   "relevantHypotheses": ["H1", "H2"],
-//   "confidence": 0.85,
-//   "alternativeAnalysis": "A natural language query for follow-up analysis"
-// }
-//   ]
-  
-//   IMPORTANT for alternativeAnalysis:
-//   - Make it a specific, actionable natural language query
-//   - It should be ready to use for code generation
-//   - Focus on validation, deeper exploration, or alternative perspectives
-//   - Keep it concise but complete (one sentence)
-  
-//   Return ONLY valid JSON, no other text.`;
-// }
 
 function buildInsightGenerationPrompt(
   cell: any,

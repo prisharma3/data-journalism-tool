@@ -158,22 +158,25 @@ if (topSuggestion.type === 'correct-value') {
 const handleInput = () => {
   if (!isEditable || !editorRef.current || !onContentChange || isComposingRef.current) return;
   
+  // Get text content (innerText handles line breaks better)
   const newText = editorRef.current.innerText;
-  
-  // Update tracking ref to prevent re-render loop
-  lastRenderedTextRef.current = newText;
   
   // Get proper cursor position by walking through all text nodes
   const selection = window.getSelection();
-  let cursorPos = 0;
+  let cursorPos = newText.length; // Default to end
   
   if (selection && selection.rangeCount > 0) {
     const range = selection.getRangeAt(0);
-    const preCaretRange = range.cloneRange();
+    
+    // Calculate cursor position by counting characters before cursor
+    const preCaretRange = document.createRange();
     preCaretRange.selectNodeContents(editorRef.current);
-    preCaretRange.setEnd(range.endContainer, range.endOffset);
+    preCaretRange.setEnd(range.startContainer, range.startOffset);
     cursorPos = preCaretRange.toString().length;
   }
+  
+  // Update tracking ref AFTER getting cursor position
+  lastRenderedTextRef.current = newText;
   
   onContentChange(newText, cursorPos);
 };
@@ -309,14 +312,28 @@ useEffect(() => {
   
   const currentText = editorRef.current.innerText;
   
-  // ALWAYS update if empty, OR if text changed externally, OR if segments changed
+  // Only update DOM when claims change (new underlines needed)
+  // Don't update just because text changed - that's handled by contentEditable
+  const claimSpanCount = editorRef.current.querySelectorAll('[data-claim-id]').length;
   const shouldUpdate = 
-    currentText === '' || 
-    (text !== currentText && text !== lastRenderedTextRef.current) ||
-    editorRef.current.querySelectorAll('[data-claim-id]').length !== claims.length;
+    currentText === '' || // Empty - need to initialize
+    claimSpanCount !== claims.length; // Claims changed - need new underlines
   
   if (shouldUpdate) {
-    console.log('🔄 Initializing editor with', claims.length, 'claims');
+    console.log('🔄 Updating editor with', claims.length, 'claims');
+    
+    // Save cursor position BEFORE modifying DOM
+    const selection = window.getSelection();
+    let savedCursorPos = 0;
+    
+    if (selection && selection.rangeCount > 0) {
+      const range = selection.getRangeAt(0);
+      const preCaretRange = document.createRange();
+      preCaretRange.selectNodeContents(editorRef.current);
+      preCaretRange.setEnd(range.startContainer, range.startOffset);
+      savedCursorPos = preCaretRange.toString().length;
+    }
+    
     lastRenderedTextRef.current = text;
     
     // Build HTML with underlined claim spans
@@ -332,8 +349,51 @@ useEffect(() => {
       }
       return segment.text;
     }).join('');
+    
+    // Restore cursor position AFTER modifying DOM
+    requestAnimationFrame(() => {
+      if (!editorRef.current) return;
+      
+      try {
+        const sel = window.getSelection();
+        const range = document.createRange();
+        
+        // Walk through text nodes to find the right position
+        const walker = document.createTreeWalker(
+          editorRef.current,
+          NodeFilter.SHOW_TEXT,
+          null
+        );
+        
+        let currentOffset = 0;
+        let targetNode: Node | null = null;
+        let targetOffset = 0;
+        
+        while (walker.nextNode()) {
+          const node = walker.currentNode;
+          const nodeLength = node.textContent?.length || 0;
+          
+          if (currentOffset + nodeLength >= savedCursorPos) {
+            targetNode = node;
+            targetOffset = savedCursorPos - currentOffset;
+            break;
+          }
+          
+          currentOffset += nodeLength;
+        }
+        
+        if (targetNode) {
+          range.setStart(targetNode, Math.min(targetOffset, targetNode.textContent?.length || 0));
+          range.collapse(true);
+          sel?.removeAllRanges();
+          sel?.addRange(range);
+        }
+      } catch (e) {
+        console.warn('Could not restore cursor:', e);
+      }
+    });
   }
-}, [isEditable, text, segments, claims.length, highlightedClaimId]);
+}, [isEditable, text, segments, claims.length, claims, highlightedClaimId, suggestions]);
 
 // Update underline colors when suggestions change
 useEffect(() => {
@@ -365,9 +425,10 @@ useEffect(() => {
   });
 }, [isEditable, highlightedClaimId]);
 
-// Editable view
+// Editable view - key forces re-render when claims change
 return (
   <div
+    key={`editor-${claims.length}-${claims.map(c => c.id).join(',')}`}
     ref={editorRef}
     contentEditable={true}
     suppressContentEditableWarning={true}

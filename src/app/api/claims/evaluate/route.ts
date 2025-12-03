@@ -254,7 +254,7 @@ function mapIssueToSuggestion(issueType: string): SuggestionType {
     'unacknowledged-rebuttal': 'acknowledge-limitation',
     'weak-backing': 'add-caveat',
     'incorrect-value': 'correct-value',
-    'factual-error': 'correct-value',
+    'factual-error': 'remove-claim',
   };
   return mapping[issueType] || 'add-caveat';
 }

@@ -155,7 +155,6 @@ if (suggestion.type === 'correct-value') {
   return;
 }
 
-
     // Handle ADD ANALYSIS
 if (suggestion.type === 'add-analysis') {
     // If already expanded, collapse it
@@ -378,6 +377,49 @@ const handleSuggestionClick = (claimId: string) => {
     console.log('✨ Highlighting cell in notebook:', cellId);
   };
 
+  // Sync with initialContent whenever it changes (from store)
+
+useEffect(() => {
+
+  if (initialContent !== undefined) {
+
+    setContent(initialContent);
+
+  }
+
+}, [initialContent]);
+
+
+
+// Clear dismissed suggestions and other state when claims are re-detected
+
+// This ensures new evaluations show fresh issues
+
+useEffect(() => {
+
+if (claims.length > 0) {
+
+  // Clear dismissed suggestions since claim IDs are new
+
+  setDismissedSuggestions(new Set());
+
+  // Clear expanded state
+
+  setExpandedSuggestionId(null);
+
+  // Clear modification options
+
+  setModificationOptions({});
+
+  setAnalysisSuggestions({});
+
+  // Clear fixed positions (they're no longer valid with new claim positions)
+
+  setFixedPositions([]);
+
+}
+
+}, [claims]); // Trigger when claims array changes
 
   return (
       <div className="flex h-full overflow-hidden">
