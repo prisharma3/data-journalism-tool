@@ -37,55 +37,121 @@ export async function POST(request: NextRequest) {
     );
 
     // Build Toulmin diagram from Gemini response
+    // const toulminDiagram = {
+    //     claimId: evaluationRequest.claim.id,
+    //     claim: evaluationRequest.claim.text,
+    //     grounds: geminiEvaluation.grounds.map((g: any) => ({
+    //       id: generateId('evidence'),
+    //       type: g.sourceType === 'insight' ? 'insight' : 'textual',
+    //       sourceId: generateId('source'),
+    //       sourceType: g.sourceType,
+    //       content: g.content,
+    //       relevanceScore: g.relevanceScore,
+    //       strengthScore: g.strengthScore,
+    //       recencyScore: 1.0,
+    //       confidenceScore: g.strengthScore,
+    //       hypothesisTags: [],
+    //       extractedStatistics: [],
+    //     })),
+    //     warrant: {
+    //       statement: geminiEvaluation.warrant.statement,
+    //       type: geminiEvaluation.warrant.type,
+    //       isExplicit: false,
+    //       acceptanceLevel: geminiEvaluation.warrant.acceptanceLevel,
+    //       needsBacking: geminiEvaluation.warrant.acceptanceLevel !== 'widely-accepted',
+    //       confidence: geminiEvaluation.warrant.confidence,
+    //     },
+    //     backing: [],
+    //     qualifier: geminiEvaluation.qualifier,
+    //     rebuttal: [],
+    //     strength: geminiEvaluation.strength,
+    //     overallScore: geminiEvaluation.overallScore,
+    //     issues: geminiEvaluation.issues.map((issue: any) => ({
+    //       id: generateId('issue'),
+    //       type: issue.type,
+    //       severity: issue.severity,
+    //       message: issue.message,
+    //       explanation: issue.explanation,
+    //     })),
+    //     gaps: geminiEvaluation.gaps.map((gap: any) => ({
+    //       id: generateId('gap'),
+    //       type: gap.type,
+    //       description: gap.description,
+    //       missingConcepts: gap.missingConcepts,
+    //       importance: gap.importance,
+    //       suggestedQuery: gap.suggestedQuery,
+    //     })),
+    //     evaluatedAt: new Date(),
+    //     recommendedAction: geminiEvaluation.recommendedAction,
+    //     actionReasoning: geminiEvaluation.actionReasoning,
+    //     modificationPaths: geminiEvaluation.modificationPaths,
+    //   };
+
+    // Build Toulmin diagram from Gemini response
+    // Handle both old and new response structures
+    const toulminAnalysis = geminiEvaluation.toulminAnalysis || {};
+    
     const toulminDiagram = {
-        claimId: evaluationRequest.claim.id,
-        claim: evaluationRequest.claim.text,
-        grounds: geminiEvaluation.grounds.map((g: any) => ({
-          id: generateId('evidence'),
-          type: g.sourceType === 'insight' ? 'insight' : 'textual',
-          sourceId: generateId('source'),
-          sourceType: g.sourceType,
-          content: g.content,
-          relevanceScore: g.relevanceScore,
-          strengthScore: g.strengthScore,
-          recencyScore: 1.0,
-          confidenceScore: g.strengthScore,
-          hypothesisTags: [],
-          extractedStatistics: [],
-        })),
-        warrant: {
-          statement: geminiEvaluation.warrant.statement,
-          type: geminiEvaluation.warrant.type,
-          isExplicit: false,
-          acceptanceLevel: geminiEvaluation.warrant.acceptanceLevel,
-          needsBacking: geminiEvaluation.warrant.acceptanceLevel !== 'widely-accepted',
-          confidence: geminiEvaluation.warrant.confidence,
-        },
-        backing: [],
-        qualifier: geminiEvaluation.qualifier,
-        rebuttal: [],
-        strength: geminiEvaluation.strength,
-        overallScore: geminiEvaluation.overallScore,
-        issues: geminiEvaluation.issues.map((issue: any) => ({
-          id: generateId('issue'),
-          type: issue.type,
-          severity: issue.severity,
-          message: issue.message,
-          explanation: issue.explanation,
-        })),
-        gaps: geminiEvaluation.gaps.map((gap: any) => ({
-          id: generateId('gap'),
-          type: gap.type,
-          description: gap.description,
-          missingConcepts: gap.missingConcepts,
-          importance: gap.importance,
-          suggestedQuery: gap.suggestedQuery,
-        })),
-        evaluatedAt: new Date(),
-        recommendedAction: geminiEvaluation.recommendedAction,
-        actionReasoning: geminiEvaluation.actionReasoning,
-        modificationPaths: geminiEvaluation.modificationPaths,
-      };
+      claimId: evaluationRequest.claim.id,
+      claim: evaluationRequest.claim.text,
+      grounds: (toulminAnalysis.grounds?.evidence || []).map((evidence: string, idx: number) => ({
+        id: generateId('evidence'),
+        type: 'textual',
+        sourceId: generateId('source'),
+        sourceType: 'cell_output',
+        content: evidence,
+        relevanceScore: 1.0,
+        strengthScore: toulminAnalysis.grounds?.strength === 'strong' ? 1.0 : 
+                       toulminAnalysis.grounds?.strength === 'moderate' ? 0.6 : 0.3,
+        recencyScore: 1.0,
+        confidenceScore: 0.8,
+        hypothesisTags: [],
+        extractedStatistics: [],
+      })),
+      warrant: {
+        statement: toulminAnalysis.warrant?.impliedAssumption || '',
+        type: 'logical',
+        isExplicit: false,
+        acceptanceLevel: 'domain-specific',
+        needsBacking: !toulminAnalysis.backing?.exists,
+        confidence: toulminAnalysis.warrant?.isValid ? 0.8 : 0.3,
+      },
+      backing: toulminAnalysis.backing?.exists ? [{
+        id: generateId('backing'),
+        content: toulminAnalysis.backing.description || '',
+        type: 'contextual',
+      }] : [],
+      qualifier: {
+        present: toulminAnalysis.qualifier?.present || [],
+        missing: toulminAnalysis.qualifier?.missing || [],
+        appropriate: toulminAnalysis.qualifier?.appropriate || false,
+      },
+      rebuttal: (toulminAnalysis.rebuttal?.possibleRebuttals || []).map((r: string) => ({
+        id: generateId('rebuttal'),
+        content: r,
+        acknowledged: toulminAnalysis.rebuttal?.acknowledged || false,
+      })),
+      strength: toulminAnalysis.grounds?.strength || 'unsupported',
+      issues: (geminiEvaluation.issues || []).map((issue: any) => ({
+        id: generateId('issue'),
+        type: issue.type,
+        severity: issue.severity,
+        message: issue.message,
+        explanation: issue.explanation,
+        suggestedFix: issue.suggestedFix,
+      })),
+      gaps: (geminiEvaluation.gaps || []).map((gap: any) => ({
+        id: generateId('gap'),
+        description: gap.description,
+        purpose: gap.purpose,
+        suggestedQuery: gap.suggestedQuery,
+        canBeResolved: gap.canBeResolved,
+      })),
+      evaluatedAt: new Date(),
+      recommendedAction: geminiEvaluation.recommendedAction,
+      actionReasoning: geminiEvaluation.actionReasoning,
+      modificationPaths: geminiEvaluation.modificationPaths || {},
+    };
 
     // Generate suggestions based on issues
 // Generate suggestions based on issues
@@ -124,7 +190,7 @@ if (geminiEvaluation.recommendedAction === 'claim-is-fine') {
     // Check if AI thinks claim is fundamentally unsupportable
     const isFundamentallyUnsupportable = geminiEvaluation.gaps && 
       geminiEvaluation.gaps.some((gap: any) => 
-        gap.importance === 'critical' && !gap.suggestedQuery
+        !gap.canBeResolved
       );
     
     if (isFundamentallyUnsupportable) {
@@ -155,12 +221,12 @@ if (geminiEvaluation.recommendedAction === 'claim-is-fine') {
             id: generateId('suggestion'),
             claimId: evaluationRequest.claim.id,
             type: 'add-analysis',
-            severity: gap.importance === 'critical' ? 'critical' : 'warning',
+            severity: (gap.purpose === 'justify-removal' || !gap.canBeResolved) ? 'critical' : 'warning',
             message: gap.description,
             explanation: `Suggested analysis: "${gap.suggestedQuery}"`,
             position: evaluationRequest.claim.position,
             actions: [],
-            priority: gap.importance === 'critical' ? 95 : 70,
+            priority: (gap.purpose === 'justify-removal' || !gap.canBeResolved) ? 95 : 70,
             createdAt: new Date(),
             status: 'active' as const,
             metadata: {
