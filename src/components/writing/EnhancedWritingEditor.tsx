@@ -123,8 +123,40 @@ const handleContentChange = (newContent: string, newPos?: number) => {
       return;
     }
   
+// Handle CORRECT VALUE
+if (suggestion.type === 'correct-value') {
+  const claim = claims.find(c => c.id === suggestion.claimId);
+  if (!claim) return;
+  
+  const suggestedFix = suggestion.metadata?.suggestedFix;
+  if (suggestedFix) {
+    // Replace the claim text with the corrected version
+    const newText = 
+      content.substring(0, claim.position.from) +
+      suggestedFix +
+      content.substring(claim.position.to);
+    
+    // Mark this position as fixed
+    setFixedPositions(prev => [...prev, {
+      from: claim.position.from,
+      to: claim.position.from + suggestedFix.length,
+      fixedAt: new Date()
+    }]);
+    
+    // Update content
+    setContent(newText);
+    if (onContentChange) {
+      onContentChange(newText);
+    }
+    
+    // Dismiss this suggestion
+    setDismissedSuggestions(prev => new Set([...prev, suggestionId]));
+  }
+  return;
+}
+
+
     // Handle ADD ANALYSIS
-// Handle ADD ANALYSIS
 if (suggestion.type === 'add-analysis') {
     // If already expanded, collapse it
     if (expandedSuggestionId === suggestionId) {
@@ -240,70 +272,6 @@ if (suggestion.type === 'add-analysis') {
   const handleDismissSuggestion = (suggestionId: string) => {
     setDismissedSuggestions(prev => new Set([...prev, suggestionId]));
   };
-
-//   const handleGenerateModification = async (suggestionId: string) => {
-//   const suggestion = suggestions.find(s => s.id === suggestionId);
-//   if (!suggestion) return;
-
-//   // If already expanded with modifications, collapse it
-//   if (expandedSuggestionId === suggestionId && modificationOptions[suggestionId]) {
-//     setExpandedSuggestionId(null);
-//     return;
-//   }
-
-//   // Expand and fetch modification suggestions
-//   setExpandedSuggestionId(suggestionId);
-
-//   // Generate claim modifications
-//   const claim = claims.find(c => c.id === suggestion.claimId);
-//   if (!claim) return;
-
-//   try {
-//     const modificationType = 
-//       suggestion.type === 'weaken-claim' ? 'weaken' :
-//       suggestion.type === 'add-caveat' ? 'caveat' :
-//       suggestion.type === 'add-qualifier' ? 'weaken' :
-//       'weaken';
-
-//     // Get the full evaluation for this claim
-//     const evalResponse = await fetch('/api/claims/evaluate', {
-//       method: 'POST',
-//       headers: { 'Content-Type': 'application/json' },
-//       body: JSON.stringify({
-//         claim,
-//         notebookContext,
-//       }),
-//     });
-
-//     if (!evalResponse.ok) {
-//       throw new Error('Failed to evaluate claim');
-//     }
-
-//     const evalData = await evalResponse.json();
-
-//     // Generate modifications
-//     const result = await generateModifications(
-//       claim.text,
-//       evalData.toulminDiagram,
-//       modificationType as any
-//     );
-
-//     console.log('Modification suggestions:', result.suggestions);
-
-//     // Store the modification options for this suggestion ID
-//     setModificationOptions(prev => ({
-//       ...prev,
-//       [suggestionId]: {
-//         suggestions: result.suggestions || [],
-//         explanations: result.explanations || [],
-//         claim: claim
-//       }
-//     }));
-//   } catch (err) {
-//     console.error('Failed to generate modifications:', err);
-//     alert('Failed to generate suggestions. Please try again.');
-//   }
-// };
 
 const handleGenerateModification = async (suggestionId: string) => {
   const suggestion = suggestions.find(s => s.id === suggestionId);
@@ -436,31 +404,6 @@ const handleSuggestionClick = (claimId: string) => {
             </label>
           </div>
 
-          {/* Status indicators
-          <div className="flex items-center gap-3 ml-auto text-xs text-gray-500">
-            {isDetecting && (
-              <span className="flex items-center gap-1">
-                <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600"></div>
-                Detecting...
-              </span>
-            )}
-            {isEvaluating && (
-              <span className="flex items-center gap-1">
-                <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-orange-600"></div>
-                Evaluating...
-              </span>
-            )}
-            {claims.length > 0 && (
-              <span className="px-2 py-1 rounded bg-blue-100 text-blue-800">
-                {claims.length} claims
-              </span>
-            )}
-            {suggestions.length > 0 && (
-              <span className="px-2 py-1 rounded bg-orange-100 text-orange-800">
-                {suggestions.length} issues
-              </span>
-            )}
-          </div> */}
           {/* Status indicators */}
 <div className="flex items-center gap-3 ml-auto text-xs text-gray-500">
   {isDetecting && (
@@ -495,7 +438,7 @@ const handleSuggestionClick = (claimId: string) => {
 <div className="flex-1 overflow-y-auto bg-white">
           <div className="max-w-4xl mx-auto p-8">
           
-          {/* Underline legend - MOVED TO TOP */}
+          {/* Underline legend */}
 {claims.length > 0 && (
   <div className="mb-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
     <div className="grid grid-cols-2 gap-2 text-xs">
@@ -514,6 +457,10 @@ const handleSuggestionClick = (claimId: string) => {
       <div className="flex items-center gap-2">
         <span className="underline decoration-orange-500 decoration-2">Orange</span>
         <span className="text-gray-600">- Add caveat</span>
+      </div>
+      <div className="flex items-center gap-2">
+        <span className="underline decoration-purple-500 decoration-2">Purple</span>
+        <span className="text-gray-600">- Correct value</span>
       </div>
       <div className="flex items-center gap-2">
         <span className="underline decoration-red-500 decoration-wavy decoration-2">Red wavy</span>

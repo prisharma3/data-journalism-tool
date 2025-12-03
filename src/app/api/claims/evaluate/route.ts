@@ -131,6 +131,7 @@ export async function POST(request: NextRequest) {
         suggestedQuery?: string;
         missingConcepts?: string[];
         gapType?: string;
+        suggestedFix?: string;
       };
     }> = [];
 
@@ -157,6 +158,9 @@ export async function POST(request: NextRequest) {
           priority: issue.severity === 'critical' ? 90 : issue.severity === 'warning' ? 60 : 30,
           createdAt: new Date(),
           status: 'active' as const,
+          metadata: {
+            suggestedFix: issue.suggestedFix,
+          },
         });
       });
       
@@ -249,6 +253,8 @@ function mapIssueToSuggestion(issueType: string): SuggestionType {
     'unqualified-absolute': 'add-qualifier',
     'unacknowledged-rebuttal': 'acknowledge-limitation',
     'weak-backing': 'add-caveat',
+    'incorrect-value': 'correct-value',
+    'factual-error': 'correct-value',
   };
   return mapping[issueType] || 'add-caveat';
 }

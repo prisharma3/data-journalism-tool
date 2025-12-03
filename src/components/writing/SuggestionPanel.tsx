@@ -81,6 +81,7 @@ export function SuggestionPanel({
       'add-qualifier': { text: 'Add Qualifier', color: 'bg-yellow-100 text-yellow-800' },
       'cite-evidence': { text: 'Cite Evidence', color: 'bg-green-100 text-green-800' },
       'clarity': { text: 'Clarity', color: 'bg-gray-100 text-gray-800' },
+      'correct-value': { text: 'Correct Value', color: 'bg-purple-100 text-purple-800' },
     };
     return labels[type] || { text: 'Suggestion', color: 'bg-gray-100 text-gray-800' };
   };
@@ -204,6 +205,26 @@ export function SuggestionPanel({
     📋 Copy Query
   </button>
 )}
+{/* Correct Value - show suggestedFix directly */}
+{suggestion.type === 'correct-value' && suggestion.metadata?.suggestedFix && (
+                      <div className="w-full">
+                        <div className="mb-2 p-3 bg-purple-50 rounded-lg border border-purple-200">
+                          <p className="text-xs text-purple-600 font-medium mb-1">Suggested correction:</p>
+                          <p className="text-sm text-purple-900">{suggestion.metadata.suggestedFix}</p>
+                        </div>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigator.clipboard.writeText(suggestion.metadata.suggestedFix);
+                            alert('Corrected text copied to clipboard!');
+                          }}
+                          className="w-full px-3 py-1.5 bg-purple-600 text-white rounded text-xs hover:bg-purple-700 transition-colors"
+                        >
+                          📋 Copy Correction
+                        </button>
+                      </div>
+                    )}
+
                     
                     {(suggestion.type === 'weaken-claim' || suggestion.type === 'add-caveat' || suggestion.type === 'add-qualifier') && (
   <button

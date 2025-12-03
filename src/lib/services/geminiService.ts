@@ -226,11 +226,19 @@ ${notebookContext.insights?.map((i: any) => `- ${i.content}`).join('\n') || 'Non
 }
 
 {
-"severity": "warning",
-"type": "missing-qualifier", 
-"message": "Specify sample scope",
-"explanation": "Your data covers 5,000 midwest farmers, but the claim implies this applies to all US farmers.",
-"suggestedFix": "Among the midwest farmers surveyed, income dropped 23% in high-tariff counties"
+"severity": "critical",
+"type": "incorrect-value",
+"message": "Correlation value is factually incorrect",
+"explanation": "The claim states a correlation of -0.92, but the notebook analysis shows the actual correlation between sepal width and sepal length is -0.1094 (a weak negative relationship).",
+"suggestedFix": "However, sepal width and sepal length show a weak negative correlation of -0.11"
+}
+
+{
+"severity": "critical", 
+"type": "factual-error",
+"message": "Dataset contains no psychological variables",
+"explanation": "The iris dataset only contains flower measurements (sepal/petal dimensions). There are no personality or psychological variables to support this claim.",
+"suggestedFix": null
 }
 
 {
@@ -276,10 +284,10 @@ ${notebookContext.insights?.map((i: any) => `- ${i.content}`).join('\n') || 'Non
 "issues": [
   {
     "severity": "critical" | "warning",
-    "type": "invalid-warrant" | "no-grounds" | "contradicts-evidence" | "unqualified-absolute" | "missing-qualifier" | "unacknowledged-rebuttal" | "weak-backing",
+    "type": "invalid-warrant" | "no-grounds" | "contradicts-evidence" | "unqualified-absolute" | "missing-qualifier" | "unacknowledged-rebuttal" | "weak-backing" | "incorrect-value" | "factual-error",
     "message": "Direct instruction, 10 words max",
     "explanation": "Why this matters based on Toulmin analysis",
-    "suggestedFix": "Complete rewritten claim"
+    "suggestedFix": "Complete rewritten claim with correct values"
   }
 ],
 "gaps": [
@@ -304,22 +312,30 @@ ${notebookContext.insights?.map((i: any) => `- ${i.content}`).join('\n') || 'Non
    - If claim is fine, return ZERO issues
    - Never return generic messages - every issue must be specific to THIS claim
 
-2. MESSAGE QUALITY:
+2. INCORRECT VALUES vs UNSUPPORTABLE CLAIMS:
+   - If a claim states a SPECIFIC NUMBER that contradicts the data, use type "incorrect-value"
+     - Example: Claim says "correlation of -0.92" but data shows -0.11 → incorrect-value, NOT remove-claim
+     - The suggestedFix MUST include the correct number from the notebook
+   - If a claim references something OUTSIDE the dataset entirely, use type "factual-error" with canBeResolved: false
+     - Example: "predicts personality traits" when dataset has no personality data → factual-error
+   - ONLY suggest "remove-claim" when the entire premise is wrong, not just a number
+
+3. MESSAGE QUALITY:
    - NEVER use generic messages like "This claim cannot be supported with available data"
    - Each message must reference the SPECIFIC problem (e.g., "No correlation data found for sepal width vs petal length")
    - Each explanation must cite SPECIFIC evidence from notebook or explain EXACTLY what's missing
 
-3. WHEN TO RETURN ZERO ISSUES:
+4. WHEN TO RETURN ZERO ISSUES:
    - Claim is descriptive and matches data (e.g., "The dataset contains 150 samples")
    - Claim has appropriate qualifiers ("suggests", "may", "in this sample")
    - Evidence exists in notebook that supports the claim
 
-4. FUNDAMENTALLY UNSUPPORTABLE - BE SPECIFIC:
+5. FUNDAMENTALLY UNSUPPORTABLE - BE SPECIFIC:
    - Don't just say "cannot be supported" - explain WHY
    - Good: "The iris dataset contains no psychological variables, so personality predictions are impossible"
    - Bad: "This claim cannot be supported with available data"
 
-5. GAPS MUST BE ACTIONABLE:
+6. GAPS MUST BE ACTIONABLE:
    - Only suggest analyses the user can actually run with their data
    - suggestedQuery must be a real, executable query
    - If no useful analysis is possible, set canBeResolved: false and explain why

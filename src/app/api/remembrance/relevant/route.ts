@@ -75,6 +75,10 @@ console.log('Remembrance agent request:', {
       return data.embedding;
     };
 
+    // Skip if embeddings aren't available (graceful degradation)
+    let relevantAnalyses: any[] = [];
+    
+    try {
     // Get relevant analyses
     const relevantAnalyses = await agent.getRelevantAnalyses(
       text,
@@ -83,6 +87,10 @@ console.log('Remembrance agent request:', {
       generateEmbedding,
       notebookContent
     );
+  } catch (embeddingError) {
+    console.warn('Remembrance agent skipped due to embedding error:', embeddingError);
+    // Continue with empty analyses rather than failing
+  }
 
     const processingTime = Date.now() - startTime;
 
@@ -122,24 +130,36 @@ export async function PUT(request: NextRequest) {
       agent = new RemembranceAgent();
     }
 
-    // Helper function to generate embeddings
-    const generateEmbedding = async (text: string): Promise<number[]> => {
-      const response = await fetch(
-        `${request.nextUrl.origin}/api/embeddings/generate`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text }),
-        }
-      );
-      
-      if (!response.ok) {
-        throw new Error('Failed to generate embedding');
+// Helper function to generate embeddings with better error handling
+const generateEmbedding = async (text: string): Promise<number[]> => {
+  try {
+    // Use absolute URL for internal API calls
+    const baseUrl = process.env.NEXTAUTH_URL || process.env.VERCEL_URL 
+      ? `https://${process.env.VERCEL_URL}` 
+      : request.nextUrl.origin;
+    
+    const response = await fetch(
+      `${baseUrl}/api/embeddings/generate`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
       }
-      
-      const data = await response.json();
-      return data.embedding;
-    };
+    );
+    
+    if (!response.ok) {
+      console.error('Embedding API error:', response.status, await response.text());
+      throw new Error('Failed to generate embedding');
+    }
+    
+    const data = await response.json();
+    return data.embedding;
+  } catch (error) {
+    console.error('Embedding generation failed:', error);
+    // Return empty array to gracefully degrade
+    return [];
+  }
+};
 
     await agent.reindex(notebookContent, generateEmbedding);
 

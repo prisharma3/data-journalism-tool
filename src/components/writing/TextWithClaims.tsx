@@ -85,6 +85,10 @@ export function TextWithClaims({
     if (topSuggestion.type === 'add-caveat') {
       return 'decoration-orange-500 decoration-2 decoration-solid';
     }
+
+    if (topSuggestion.type === 'correct-value') {
+      return 'decoration-purple-500 decoration-2 decoration-solid';
+    }
     
     if (topSuggestion.severity === 'critical') {
       return 'decoration-red-500 decoration-wavy decoration-2';
@@ -126,6 +130,11 @@ export function TextWithClaims({
   if (topSuggestion.type === 'add-caveat') {
     return 'text-decoration: underline; text-decoration-color: rgb(249, 115, 22); text-decoration-thickness: 2px; text-decoration-style: solid;';
   }
+
+// Correct value - purple solid
+if (topSuggestion.type === 'correct-value') {
+  return 'text-decoration: underline; text-decoration-color: rgb(147, 51, 234); text-decoration-thickness: 2px; text-decoration-style: solid;';
+}
   
   // Fallback based on severity
   if (topSuggestion.severity === 'critical') {
@@ -168,84 +177,6 @@ const handleInput = () => {
   
   onContentChange(newText, cursorPos);
 };
-
-//   // Only update DOM when text changes from external source (not from typing)
-//   useEffect(() => {
-//     if (!isEditable || !editorRef.current) return;
-    
-//     const currentText = editorRef.current.innerText;
-    
-//     // Only update if text changed externally (not from our own typing)
-//     if (text !== currentText && text !== lastRenderedTextRef.current) {
-//       lastRenderedTextRef.current = text;
-      
-//       // Save cursor position
-//       const selection = window.getSelection();
-//       let cursorOffset = 0;
-      
-//       if (selection && selection.rangeCount > 0) {
-//         const range = selection.getRangeAt(0);
-//         cursorOffset = range.startOffset;
-//       }
-      
-//       // Update the HTML
-//       editorRef.current.innerHTML = segments.map((segment) => {
-//         if (segment.claim) {
-//           const isHighlighted = highlightedClaimId === segment.claim.id;
-//           const underlineClass = getUnderlineClass(segment.claim);
-//           const tooltip = getTooltip(segment.claim);
-//           const highlightClass = isHighlighted ? 'bg-yellow-100 ring-2 ring-yellow-400' : '';
-
-//           const claimUnderlineClass = getUnderlineClass(segment.claim);
-// return `<span data-claim-id="${segment.claim.id}" class="underline underline-offset-4 ${claimUnderlineClass} cursor-pointer hover:bg-gray-100 transition-colors ${highlightClass}" title="${tooltip.replace(/"/g, '&quot;')}">${segment.text}</span>`;
-//         }
-//         return segment.text;
-//       }).join('');
-      
-//       // Restore cursor
-//       requestAnimationFrame(() => {
-//         if (editorRef.current) {
-//           try {
-//             const range = document.createRange();
-//             const sel = window.getSelection();
-            
-//             // Walk through text nodes to find cursor position
-//             const walker = document.createTreeWalker(
-//               editorRef.current,
-//               NodeFilter.SHOW_TEXT,
-//               null
-//             );
-            
-//             let currentOffset = 0;
-//             let targetNode = null;
-//             let targetOffset = 0;
-            
-//             while (walker.nextNode()) {
-//               const node = walker.currentNode;
-//               const nodeLength = node.textContent?.length || 0;
-              
-//               if (currentOffset + nodeLength >= cursorOffset) {
-//                 targetNode = node;
-//                 targetOffset = cursorOffset - currentOffset;
-//                 break;
-//               }
-              
-//               currentOffset += nodeLength;
-//             }
-            
-//             if (targetNode) {
-//               range.setStart(targetNode, targetOffset);
-//               range.collapse(true);
-//               sel?.removeAllRanges();
-//               sel?.addRange(range);
-//             }
-//           } catch (e) {
-//             console.warn('Could not restore cursor:', e);
-//           }
-//         }
-//       });
-//     }
-//   }, [text, segments, highlightedClaimId, isEditable]);
 
 // Only update DOM when text changes from external source (not from typing)
 useEffect(() => {
@@ -371,69 +302,6 @@ useEffect(() => {
       </div>
     );
   }
-
-// // Editable view - need to initialize content on mount and update when segments change
-// useEffect(() => {
-//   if (isEditable && editorRef.current) {
-//     // Save cursor position before updating
-//     const selection = window.getSelection();
-//     let cursorOffset = 0;
-//     if (selection && selection.rangeCount > 0) {
-//       const range = selection.getRangeAt(0);
-//       cursorOffset = range.startOffset;
-//     }
-    
-//     // Update the HTML with claim spans
-//     editorRef.current.innerHTML = segments.map((segment) => {
-//       if (segment.claim) {
-//         const underlineStyle = getUnderlineStyle(segment.claim);
-//         const tooltip = getTooltip(segment.claim);
-//         return `<span data-claim-id="${segment.claim.id}" style="${underlineStyle}" class="cursor-pointer hover:bg-gray-100 transition-colors" title="${tooltip.replace(/"/g, '&quot;')}">${segment.text}</span>`;
-//       }
-//       return segment.text;
-//     }).join('');
-    
-//     // Restore cursor position
-//     if (cursorOffset > 0) {
-//       requestAnimationFrame(() => {
-//         try {
-//           const range = document.createRange();
-//           const sel = window.getSelection();
-//           const walker = document.createTreeWalker(
-//             editorRef.current!,
-//             NodeFilter.SHOW_TEXT,
-//             null
-//           );
-          
-//           let currentOffset = 0;
-//           let targetNode = null;
-//           let targetOffset = 0;
-          
-//           while (walker.nextNode()) {
-//             const node = walker.currentNode;
-//             const nodeLength = node.textContent?.length || 0;
-            
-//             if (currentOffset + nodeLength >= cursorOffset) {
-//               targetNode = node;
-//               targetOffset = cursorOffset - currentOffset;
-//               break;
-//             }
-//             currentOffset += nodeLength;
-//           }
-          
-//           if (targetNode) {
-//             range.setStart(targetNode, targetOffset);
-//             range.collapse(true);
-//             sel?.removeAllRanges();
-//             sel?.addRange(range);
-//           }
-//         } catch (e) {
-//           console.warn('Could not restore cursor:', e);
-//         }
-//       });
-//     }
-//   }
-// }, [isEditable, segments, suggestions]); // Add suggestions to deps so colors update
 
 // Initialize editor content on first render and when text/segments change
 useEffect(() => {

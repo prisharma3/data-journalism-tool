@@ -263,12 +263,13 @@ export interface ClaimStructure {
     createdAt: Date;
     status: 'active' | 'dismissed' | 'accepted';
     
-    // NEW: Metadata for analysis and removal suggestions
+    // Metadata for analysis and removal suggestions
     metadata?: {
       suggestedQuery?: string;
       missingConcepts?: string[];
       gapType?: string;
       reason?: string;
+      suggestedFix?: string;
     };
   }
   
@@ -282,7 +283,9 @@ export interface ClaimStructure {
   | 'cite-evidence'
   | 'acknowledge-limitation'
   | 'grammar'
-  | 'relevance';
+  | 'relevance'
+  | 'correct-value'
+  | 'link-hypothesis';
   
   export interface SuggestionAction {
     id: string;
