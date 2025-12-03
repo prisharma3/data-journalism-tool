@@ -312,12 +312,21 @@ useEffect(() => {
   
   const currentText = editorRef.current.innerText;
   
-  // Only update DOM when claims change (new underlines needed)
-  // Don't update just because text changed - that's handled by contentEditable
-  const claimSpanCount = editorRef.current.querySelectorAll('[data-claim-id]').length;
+  // Check if claim IDs have changed (not just count)
+  const existingClaimIds = Array.from(
+    editorRef.current.querySelectorAll('[data-claim-id]')
+  ).map(span => span.getAttribute('data-claim-id'));
+  
+  const currentClaimIds = claims.map(c => c.id);
+  
+  // Compare arrays - need to re-render if IDs are different
+  const claimIdsChanged = 
+    existingClaimIds.length !== currentClaimIds.length ||
+    !existingClaimIds.every((id, idx) => id === currentClaimIds[idx]);
+  
   const shouldUpdate = 
     currentText === '' || // Empty - need to initialize
-    claimSpanCount !== claims.length; // Claims changed - need new underlines
+    claimIdsChanged; // Claims changed (IDs or count) - need new underlines
   
   if (shouldUpdate) {
     console.log('🔄 Updating editor with', claims.length, 'claims');
@@ -408,7 +417,7 @@ useEffect(() => {
       (span as HTMLElement).setAttribute('style', underlineStyle);
     }
   });
-}, [isEditable, suggestions, claims]);
+}, [isEditable, suggestions, claims, isEvaluating]);
 
 // Update highlighting when highlightedClaimId changes
 useEffect(() => {
