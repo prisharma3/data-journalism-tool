@@ -88,37 +88,6 @@ const evaluateClaims = useCallback(async (claimsToEvaluate: ClaimStructure[]) =>
   }
 }, [notebookContext]);
 
-  /**
-   * Detect claims in text
-   */
-  // const detectClaims = useCallback(async () => {
-  //   console.log('🔍 detectClaims called:', { 
-  //       enabled, 
-  //       textLength: text?.length, 
-  //       lastTextLength: lastTextRef.current?.length,
-  //       sameAsLast: text === lastTextRef.current 
-  //     });
-      
-  //     if (!enabled) {
-  //       console.log('❌ Detection disabled');
-  //       return;
-  //     }
-      
-  //     if (!text || text.trim().length === 0) {
-  //       console.log('❌ No text');
-  //       return;
-  //     }
-      
-  //     if (text === lastTextRef.current) {
-  //       console.log('❌ Same text as last');
-  //       return;
-  //     }
-      
-  //     console.log('✅ Starting claim detection...');
-    
-  //   setIsDetecting(true);
-  //   setError(null);
-  //   lastTextRef.current = text;
   const detectClaims = useCallback(async () => {
     console.log('🔍 detectClaims called:', { 
         enabled, 
@@ -133,7 +102,12 @@ const evaluateClaims = useCallback(async (claimsToEvaluate: ClaimStructure[]) =>
       }
       
       if (!text || text.trim().length === 0) {
-        console.log('❌ No text');
+        console.log('❌ No text - clearing all claims and suggestions');
+        setClaims([]);
+        setSuggestions([]);
+        setRelevantAnalyses([]);
+        setError(null);
+        lastTextRef.current = '';  // Reset the ref so new text will trigger detection
         return;
       }
       

@@ -245,16 +245,17 @@ function mapIssueToSuggestion(issueType: string): SuggestionType {
     'no-evidence': 'add-analysis',
     'weak-evidence': 'add-analysis',
     'overclaim': 'weaken-claim',
+    'overinterpretation': 'weaken-claim',
     'missing-qualifier': 'add-qualifier',
-    'causation-correlation': 'add-caveat',
-    'invalid-warrant': 'add-caveat',
+    'causation-correlation': 'weaken-claim',
+    'invalid-warrant': 'weaken-claim',  
     'no-grounds': 'add-analysis',
-    'contradicts-evidence': 'remove-claim',
+    'contradicts-evidence': 'correct-value', 
     'unqualified-absolute': 'add-qualifier',
     'unacknowledged-rebuttal': 'acknowledge-limitation',
     'weak-backing': 'add-caveat',
     'incorrect-value': 'correct-value',
-    'factual-error': 'remove-claim',
+    'factual-error': 'remove-claim', 
   };
   return mapping[issueType] || 'add-caveat';
 }

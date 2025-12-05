@@ -35,29 +35,32 @@ export async function POST(request: NextRequest) {
     const detectedClaims = await gemini.detectClaims(text, projectContext);
 
     // Convert to ClaimStructure format
-    const claims: ClaimStructure[] = detectedClaims.map((detected: any) => ({
-      id: generateId('claim'),
-      text: detected.text,
-      position: {
-        from: detected.position.from,
-        to: detected.position.to,
-        paragraphIndex: 0, // Calculate if needed
+// Convert to ClaimStructure format
+const claims: ClaimStructure[] = detectedClaims.map((detected: any) => ({
+  id: generateId('claim'),
+  text: detected.text,
+  position: {
+    from: detected.position?.from ?? 0,
+    to: detected.position?.to ?? detected.text?.length ?? 0,
+    paragraphIndex: 0,
+  },
+  type: detected.type || 'descriptive',
+  confidence: detected.confidence ?? 0.8,
+  detectedAt: new Date(),
+  hypothesisLinks: [],
+  strongLanguage: (detected.strongLanguage || [])
+    .filter((marker: any) => marker && marker.word)
+    .map((marker: any) => ({
+      word: marker.word,
+      type: marker.type || 'absolute',
+      position: { 
+        from: detected.position?.from ?? 0, 
+        to: (detected.position?.from ?? 0) + (marker.word?.length ?? 0)
       },
-      type: detected.type,
-      confidence: detected.confidence,
-      detectedAt: new Date(),
-      hypothesisLinks: [], // TODO: Implement hypothesis linking
-      strongLanguage: detected.strongLanguage.map((marker: any) => ({
-        word: marker.word,
-        type: marker.type,
-        position: { 
-          from: detected.position.from, 
-          to: detected.position.from + marker.word.length 
-        },
-        intensity: marker.intensity,
-      })),
-      status: 'detected' as const,
-    }));
+      intensity: marker.intensity ?? 0.5,
+    })),
+  status: 'detected' as const,
+}));
 
     const processingTime = Date.now() - startTime;
 
