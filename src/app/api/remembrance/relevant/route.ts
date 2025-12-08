@@ -134,9 +134,11 @@ export async function PUT(request: NextRequest) {
 const generateEmbedding = async (text: string): Promise<number[]> => {
   try {
     // Use absolute URL for internal API calls
-    const baseUrl = process.env.NEXTAUTH_URL || process.env.VERCEL_URL 
-      ? `https://${process.env.VERCEL_URL}` 
-      : request.nextUrl.origin;
+    // const baseUrl = process.env.NEXTAUTH_URL || process.env.VERCEL_URL 
+    //   ? `https://${process.env.VERCEL_URL}` 
+    //   : request.nextUrl.origin;
+
+    const baseUrl = process.env.APP_URL || request.nextUrl.origin;
     
     const response = await fetch(
       `${baseUrl}/api/embeddings/generate`,
