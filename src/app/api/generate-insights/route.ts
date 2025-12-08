@@ -187,9 +187,17 @@ Generate 1-3 insights from the analysis output. Each insight must pass this test
  - BAD: "Younger farmers are more affected than older farmers"
  - GOOD: "Farmers under 40 show 35% income decline vs 15% for those over 40"
 
-6. **IF THE OUTPUT HAS NO CLEAR FINDING, RETURN EMPTY ARRAY**
- - Don't invent insights from ambiguous results
- - "No significant pattern found" is not an insight worth saving
+6. **FOR DATA PREVIEWS (head, describe, info, shape, etc.)**
+ - Generate descriptive insights about the data structure
+ - GOOD: "Dataset contains 150 samples with 5 features: sepal_length, sepal_width, petal_length, petal_width, and species"
+ - GOOD: "Three species are represented: setosa, versicolor, and virginica"
+ - GOOD: "Sepal length ranges from 4.3 to 7.9 with a mean of 5.84"
+ - These are valid insights for understanding the data
+
+7. **ONLY RETURN EMPTY ARRAY IF:**
+ - The output is an error message
+ - The output is completely empty
+ - The output shows only "success" or "complete" with no data
 
 **EXAMPLES OF GOOD INSIGHTS:**
 - "Correlation between tariff_exposure and income: r=-0.78, p<0.01"
