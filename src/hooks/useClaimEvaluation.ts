@@ -33,6 +33,8 @@ export function useClaimEvaluation({
   const [error, setError] = useState<string | null>(null);
 
   const lastTextRef = useRef<string>('');
+  const lastContextHashRef = useRef<string>('');
+
 
 /**
  * Evaluate detected claims
@@ -296,6 +298,45 @@ useEffect(() => {
       debouncedRelevant.cancel();
     };
   }, [cursorPosition, enabled, text, getRelevantAnalyses]);
+
+  // Re-evaluate claims when notebookContext changes (new analysis added)
+useEffect(() => {
+  if (!enabled || claims.length === 0) {
+    return;
+  }
+  
+  // Create a simple hash of notebook context to detect changes
+  const contextHash = JSON.stringify({
+    cellCount: notebookContext.cells?.length || 0,
+    insightCount: notebookContext.insights?.length || 0,
+    lastCellOutput: notebookContext.cells?.[notebookContext.cells.length - 1]?.output?.text?.substring(0, 100) || '',
+  });
+  
+  // Skip if context hasn't changed
+  if (contextHash === lastContextHashRef.current) {
+    return;
+  }
+  
+  // Skip on initial mount
+  if (lastContextHashRef.current === '') {
+    lastContextHashRef.current = contextHash;
+    return;
+  }
+  
+  lastContextHashRef.current = contextHash;
+  
+  console.log('📊 Notebook context changed - re-evaluating claims');
+  
+  const debouncedEvaluate = debounce(() => {
+    evaluateClaims(claims);
+  }, 500);
+  
+  debouncedEvaluate();
+  
+  return () => {
+    debouncedEvaluate.cancel();
+  };
+}, [notebookContext, enabled, claims, evaluateClaims]);
     
   return {
     // State

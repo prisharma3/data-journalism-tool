@@ -57,6 +57,15 @@ export default function Minimap({ projectId, sections = [], onSectionClick }: Mi
 
   const handleSectionClick = (sectionId: string) => {
     setActiveSection(sectionId);
+    
+    // Dispatch custom event for NotebookCanvas to handle scrolling
+    const event = new CustomEvent('minimap-section-click', {
+      detail: { sectionId },
+      bubbles: true,
+    });
+    window.dispatchEvent(event);
+    
+    // Also call the callback if provided
     if (onSectionClick) {
       onSectionClick(sectionId);
     }
