@@ -336,6 +336,17 @@ const handleClaimClick = (claimId: string) => {
   }, 100);
   
   // ALSO scroll to the corresponding suggestion in the panel
+  // setTimeout(() => {
+  //   const suggestionForClaim = suggestions.find(s => s.claimId === claimId);
+  //   if (suggestionForClaim) {
+  //     const suggestionElement = document.getElementById(`suggestion-${suggestionForClaim.id}`);
+  //     console.log('Scrolling to suggestion:', suggestionForClaim.id, suggestionElement ? 'found' : 'not found');
+      
+  //     if (suggestionElement) {
+  //       suggestionElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  //     }
+  //   }
+  // }, 100);
   setTimeout(() => {
     const suggestionForClaim = suggestions.find(s => s.claimId === claimId);
     if (suggestionForClaim) {
@@ -343,7 +354,14 @@ const handleClaimClick = (claimId: string) => {
       console.log('Scrolling to suggestion:', suggestionForClaim.id, suggestionElement ? 'found' : 'not found');
       
       if (suggestionElement) {
-        suggestionElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        // Find the panel's scroll container and scroll within it only
+        const scrollContainer = suggestionElement.closest('.overflow-y-auto');
+        if (scrollContainer) {
+          const containerRect = scrollContainer.getBoundingClientRect();
+          const elementRect = suggestionElement.getBoundingClientRect();
+          const targetScroll = scrollContainer.scrollTop + (elementRect.top - containerRect.top) - (containerRect.height / 2) + (elementRect.height / 2);
+          scrollContainer.scrollTo({ top: Math.max(0, targetScroll), behavior: 'smooth' });
+        }
       }
     }
   }, 100);

@@ -87,7 +87,7 @@ export function SuggestionPanel({
   };
 
   return (
-      <div className="w-64 border-l border-gray-200 bg-white flex flex-col" style={{ height: '100vh' }}>
+<div className="w-64 border-l border-gray-200 bg-white flex flex-col h-full">
         {/* Header */}
         <div className="border-b border-gray-200 px-3 py-2.5 bg-gray-50 flex-shrink-0">
           <h3 className="text-xs font-medium text-gray-700">

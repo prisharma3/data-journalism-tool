@@ -299,17 +299,18 @@ useEffect(() => {
     };
   }, [cursorPosition, enabled, text, getRelevantAnalyses]);
 
-  // Re-evaluate claims when notebookContext changes (new analysis added)
+// Re-detect and re-evaluate claims when notebookContext changes (new analysis added)
 useEffect(() => {
-  if (!enabled || claims.length === 0) {
+  if (!enabled || !text || text.trim().length === 0) {
     return;
   }
   
-  // Create a simple hash of notebook context to detect changes
+  // Create a comprehensive hash to detect meaningful notebook changes
   const contextHash = JSON.stringify({
     cellCount: notebookContext.cells?.length || 0,
     insightCount: notebookContext.insights?.length || 0,
-    lastCellOutput: notebookContext.cells?.[notebookContext.cells.length - 1]?.output?.text?.substring(0, 100) || '',
+    cellOutputs: notebookContext.cells?.map((c: any) => c.output?.text?.substring(0, 50) || '').join('|') || '',
+    insightContents: notebookContext.insights?.map((i: any) => i.content?.substring(0, 30) || '').join('|') || '',
   });
   
   // Skip if context hasn't changed
@@ -325,19 +326,27 @@ useEffect(() => {
   
   lastContextHashRef.current = contextHash;
   
-  console.log('📊 Notebook context changed - re-evaluating claims');
+  console.log('📊 Notebook context changed - triggering full re-detection and re-evaluation');
   
-  const debouncedEvaluate = debounce(() => {
-    evaluateClaims(claims);
+  // Force re-detection by clearing lastTextRef so detectClaims will run
+  const currentText = lastTextRef.current;
+  lastTextRef.current = '';
+  
+  const debouncedRedetect = debounce(() => {
+    detectClaims();
   }, 500);
   
-  debouncedEvaluate();
+  debouncedRedetect();
   
   return () => {
-    debouncedEvaluate.cancel();
+    debouncedRedetect.cancel();
+    // Restore if cancelled
+    if (lastTextRef.current === '') {
+      lastTextRef.current = currentText;
+    }
   };
-}, [notebookContext, enabled, claims, evaluateClaims]);
-    
+}, [notebookContext, enabled, text, detectClaims]);
+
   return {
     // State
     claims,
