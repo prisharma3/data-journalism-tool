@@ -3,17 +3,24 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuthStore } from '@/stores/authStore';
+import { useProjectState } from '@/hooks/useProjectState';
 import Minimap from '@/components/minimap/Minimap';
 import NotebookCanvas from '@/components/notebook/NotebookCanvas';
 import WritingContainer from '@/components/writing/WritingContainer';
-import { GripVertical } from 'lucide-react';
+import { GripVertical, ArrowLeft, LogOut, Save, Loader2, Check } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 export default function ProjectPage() {
   const params = useParams();
   const router = useRouter();
-  const { isAuthenticated, user } = useAuthStore();
+  const { isAuthenticated, user, logout } = useAuthStore();
   const [isLoading, setIsLoading] = useState(true);
   const projectId = params.id as string;
+
+  // Project state management (auto-save + manual save)
+  const { saveState } = useProjectState(projectId);
+  const [isSaving, setIsSaving] = useState(false);
+  const [showSaved, setShowSaved] = useState(false);
   
   // Panel widths
   const [minimapWidth, setMinimapWidth] = useState(120);
@@ -39,6 +46,31 @@ export default function ProjectPage() {
     setIsLoading(false);
   }, [isAuthenticated, user, router]);
 
+  // Manual save handler
+  const handleManualSave = async () => {
+    setIsSaving(true);
+    try {
+      await saveState();
+      setShowSaved(true);
+      setTimeout(() => setShowSaved(false), 2000);
+    } catch (error) {
+      console.error('Failed to save:', error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Return to dashboard handler
+  const handleReturnToDashboard = () => {
+    router.push('/dashboard');
+  };
+
+  // Sign out handler
+  const handleSignOut = () => {
+    logout();
+    router.push('/login');
+  };
+
   // Left divider drag (minimap resize)
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
@@ -58,15 +90,11 @@ export default function ProjectPage() {
     if (isDraggingLeft) {
       document.addEventListener('mousemove', handleMouseMove);
       document.addEventListener('mouseup', handleMouseUp);
-      document.body.style.cursor = 'col-resize';
-      document.body.style.userSelect = 'none';
     }
 
     return () => {
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
     };
   }, [isDraggingLeft]);
 
@@ -89,84 +117,113 @@ export default function ProjectPage() {
     if (isDraggingRight) {
       document.addEventListener('mousemove', handleMouseMove);
       document.addEventListener('mouseup', handleMouseUp);
-      document.body.style.cursor = 'col-resize';
-      document.body.style.userSelect = 'none';
     }
 
     return () => {
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
     };
   }, [isDraggingRight]);
 
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-gray-600">Loading project...</div>
+        <div className="text-gray-600">Loading...</div>
       </div>
     );
   }
 
   return (
-    <div 
-      ref={containerRef}
-      className="min-h-screen bg-gray-50 flex"
-    >
-{/* Panel 1: Minimap */}
-<div 
-        className="bg-white border-r border-gray-200 flex-shrink-0"
-        style={{ width: `${minimapWidth}px` }}
-      >
-        <Minimap 
-          projectId={projectId} 
-          sections={minimapSections}
-          onSectionClick={(sectionId) => {
-            // Dispatch event to scroll to section in notebook
-            const event = new CustomEvent('minimap-section-click', {
-              detail: { sectionId },
-              bubbles: true,
-            });
-            window.dispatchEvent(event);
-          }}
-        />
-      </div>
-
-      {/* Left Resize Handle */}
-      <div
-        className="w-1 bg-gray-200 hover:bg-blue-500 cursor-col-resize flex-shrink-0 transition-colors relative group"
-        onMouseDown={() => setIsDraggingLeft(true)}
-      >
-        <div className="absolute inset-0 flex items-center justify-center">
-          <GripVertical className="w-3 h-3 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+    <div className="h-screen flex flex-col overflow-hidden" ref={containerRef}>
+      {/* Header */}
+      <header className="bg-white border-b border-gray-200 px-4 py-2 flex items-center justify-between shrink-0">
+        <div className="flex items-center space-x-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleReturnToDashboard}
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Dashboard
+          </Button>
+          
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleManualSave}
+            disabled={isSaving}
+          >
+            {isSaving ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : showSaved ? (
+              <Check className="w-4 h-4 mr-2 text-green-600" />
+            ) : (
+              <Save className="w-4 h-4 mr-2" />
+            )}
+            {isSaving ? 'Saving...' : showSaved ? 'Saved!' : 'Save'}
+          </Button>
+          
+          <span className="text-xs text-gray-400 ml-2">
+            Auto-saves every few seconds
+          </span>
         </div>
-      </div>
-
-      {/* Panel 2: Notebook (Code + Insights) */}
-<div className="flex-1 bg-white border-r border-gray-200 min-w-0">
-        <NotebookCanvas 
-          projectId={projectId}
-          onSectionsChange={setMinimapSections}
-        />
-      </div>
-
-      {/* Right Resize Handle */}
-      <div
-        className="w-1 bg-gray-200 hover:bg-blue-500 cursor-col-resize flex-shrink-0 transition-colors relative group"
-        onMouseDown={() => setIsDraggingRight(true)}
-      >
-        <div className="absolute inset-0 flex items-center justify-center">
-          <GripVertical className="w-3 h-3 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+        
+        <div className="flex items-center space-x-4">
+          <span className="text-sm text-gray-600">
+            {user?.firstName} {user?.lastName}
+          </span>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleSignOut}
+          >
+            <LogOut className="w-4 h-4 mr-2" />
+            Sign Out
+          </Button>
         </div>
-      </div>
+      </header>
 
-      {/* Panel 3: Writing */}
-      <div 
-        className="bg-white flex-shrink-0"
-        style={{ width: `${writingWidth}px` }}
-      >
-        <WritingContainer projectId={projectId} />
+      {/* Main Content */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Minimap Panel */}
+        <div 
+          className="bg-gray-100 border-r border-gray-200 overflow-hidden shrink-0"
+          style={{ width: minimapWidth }}
+        >
+          <Minimap sections={minimapSections} />
+        </div>
+
+        {/* Left Resizer */}
+        <div
+          className="w-1 bg-gray-200 hover:bg-blue-400 cursor-col-resize flex items-center justify-center shrink-0 transition-colors"
+          onMouseDown={() => setIsDraggingLeft(true)}
+        >
+          <GripVertical className="w-3 h-3 text-gray-400" />
+        </div>
+
+        {/* Notebook Panel */}
+        <div className="flex-1 overflow-hidden">
+          <NotebookCanvas 
+            projectId={projectId} 
+            onSectionsChange={setMinimapSections}
+          />
+        </div>
+
+        {/* Right Resizer */}
+        <div
+          className="w-1 bg-gray-200 hover:bg-blue-400 cursor-col-resize flex items-center justify-center shrink-0 transition-colors"
+          onMouseDown={() => setIsDraggingRight(true)}
+        >
+          <GripVertical className="w-3 h-3 text-gray-400" />
+        </div>
+
+        {/* Writing Panel */}
+        <div 
+          className="bg-white border-l border-gray-200 overflow-hidden shrink-0"
+          style={{ width: writingWidth }}
+        >
+          <WritingContainer projectId={projectId} />
+        </div>
       </div>
     </div>
   );

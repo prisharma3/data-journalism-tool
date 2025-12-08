@@ -31,3 +31,19 @@ CREATE TABLE datasets (
     ai_summary TEXT,
     uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+
+-- Password Reset Codes table
+CREATE TABLE password_reset_codes (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    code VARCHAR(5) NOT NULL,
+    email VARCHAR(255) NOT NULL,
+    expires_at TIMESTAMP NOT NULL,
+    used BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Index for faster lookups
+CREATE INDEX idx_password_reset_codes_email ON password_reset_codes(email);
+CREATE INDEX idx_password_reset_codes_code ON password_reset_codes(code);
