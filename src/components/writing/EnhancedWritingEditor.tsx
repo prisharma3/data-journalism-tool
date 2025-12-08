@@ -421,12 +421,13 @@ if (claims.length > 0) {
 
 }, [claims]); // Trigger when claims array changes
 
-  return (
-      <div className="flex h-full overflow-hidden">
-        {/* Main editor area */}
-        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        {/* Toolbar */}
-        <div className="border-b border-gray-200 bg-white px-4 py-2 flex items-center gap-4">
+
+return (
+  <div className="flex h-full overflow-hidden">
+    {/* Main editor area */}
+    <div className="flex-1 flex flex-col min-w-0 h-full">
+    {/* Toolbar - always visible at top */}
+    <div className="border-b border-gray-200 bg-white px-4 py-2 flex items-center gap-4 flex-shrink-0">
           <div className="flex items-center gap-2">
             <label className="flex items-center gap-2 text-sm text-gray-700">
             <input
@@ -477,7 +478,7 @@ if (claims.length > 0) {
         </div>
 
 {/* Editor - Single editable view with inline claim highlights */}
-<div className="flex-1 overflow-y-auto bg-white">
+<div className="flex-1 overflow-y-auto bg-white min-h-0">
           <div className="max-w-4xl mx-auto p-8">
           
           {/* Underline legend */}

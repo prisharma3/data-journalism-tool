@@ -119,8 +119,8 @@ const evaluateClaims = useCallback(async (claimsToEvaluate: ClaimStructure[]) =>
       console.log('✅ Starting claim detection...');
     
     // CLEAR old claims and suggestions immediately when starting new detection
-    setClaims([]);
-    setSuggestions([]);
+    // setClaims([]);
+    // setSuggestions([]);
     
     setIsDetecting(true);
     setError(null);
