@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useProjectStore } from '@/stores/projectStore';
 import { useAuthStore } from '@/stores/authStore';
 import { EnhancedWritingEditor } from './EnhancedWritingEditor';
@@ -26,11 +26,14 @@ export default function WritingContainer({ projectId }: WritingContainerProps) {
     const [error, setError] = useState<string | null>(null);
     const [wordCount, setWordCount] = useState(0);
 
-// Load article content on mount - only if store is empty
+// Track which project we've loaded content for
+const loadedProjectRef = useRef<string | null>(null);
+
+// Load article content on mount or when project changes
 useEffect(() => {
     const loadArticle = async () => {
-      // Skip loading if we already have content in the store
-      if (storedContent) {
+      // Skip loading if we already loaded for this project
+      if (loadedProjectRef.current === projectId && storedContent !== undefined) {
         setIsLoading(false);
         return;
       }
@@ -50,6 +53,7 @@ useEffect(() => {
         const data = await response.json();
         setStoredContent(data.article.content || '');
         setWordCount(data.article.word_count || 0);
+        loadedProjectRef.current = projectId;
       } catch (err: any) {
         console.error('Error loading article:', err);
         setError(err.message || 'Failed to load article');
@@ -90,8 +94,15 @@ useEffect(() => {
     }
   };
 
-  // Use auto-save hook
-  useAutoSave(storedContent, saveArticle, 3000); // Save every 3 seconds
+// Use auto-save hook
+const { debouncedSave } = useAutoSave<string>({
+  delay: 3000,
+  onSave: async (content: string) => {
+    const words = content.trim().split(/\s+/).filter(word => word.length > 0);
+    await saveArticle(content, words.length);
+  },
+  dependencies: [storedContent],
+});
 
 // Handle content change from editor
 const handleContentChange = (newContent: string) => {

@@ -197,7 +197,9 @@ export function SuggestionPanel({
   <button
     onClick={(e) => {
       e.stopPropagation();
-      navigator.clipboard.writeText(suggestion.metadata.suggestedQuery);
+      if (suggestion.metadata?.suggestedQuery) {
+        navigator.clipboard.writeText(suggestion.metadata.suggestedQuery);
+      }
       alert('Analysis query copied! Paste it in the notebook to run.');
     }}
     className="flex-1 px-3 py-1.5 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 transition-colors"
@@ -215,7 +217,9 @@ export function SuggestionPanel({
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            navigator.clipboard.writeText(suggestion.metadata.suggestedFix);
+                            if (suggestion.metadata?.suggestedFix) {
+                              navigator.clipboard.writeText(suggestion.metadata.suggestedFix);
+                            }
                             alert('Corrected text copied to clipboard!');
                           }}
                           className="w-full px-3 py-1.5 bg-purple-600 text-white rounded text-xs hover:bg-purple-700 transition-colors"

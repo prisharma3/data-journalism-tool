@@ -3,15 +3,45 @@
  * Generates insights from analysis outputs using Gemini API via server route
  */
 
-import { CodeCellType, Dataset, Hypothesis } from '@/types/notebook';
+// Use flexible local types to accept various data shapes
+interface FlexibleCell {
+  id: string;
+  type?: string;
+  content: string;
+  query?: string;
+  hypothesisTags?: string[];
+  output?: {
+    text?: string;
+    plot?: string;
+    executionTime?: number;
+  };
+  error?: string;
+  executionCount?: number;
+  isRunning?: boolean;
+  isGenerating?: boolean;
+  [key: string]: any;  // Allow additional properties
+}
+
+interface FlexibleHypothesis {
+  id: string;
+  content: string;
+  [key: string]: any;  // Allow additional properties
+}
+
+interface FlexibleDataset {
+  filename?: string;
+  summary?: any;
+  [key: string]: any;
+}
 
 export interface InsightGenerationRequest {
-    cell: CodeCellType;
-    dataset?: Dataset | null;
-    hypotheses?: Hypothesis[];
-    allCells?: CodeCellType[];
-    tags?: any[]; 
-  }
+  cell: FlexibleCell;
+  dataset?: FlexibleDataset | null;
+  hypotheses?: FlexibleHypothesis[];
+  allCells?: FlexibleCell[];
+  tags?: any[];
+}
+
 export interface GeneratedInsight {
   content: string;
   suggestedTag?: string;

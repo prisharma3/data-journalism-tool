@@ -1,3 +1,5 @@
+// In src/hooks/useProjectState.ts
+
 import { useCallback, useEffect, useRef } from 'react';
 import { useAuthStore } from '@/stores/authStore';
 import { useProjectStore } from '@/stores/projectStore';
@@ -6,6 +8,7 @@ export function useProjectState(projectId: string) {
   const { token } = useAuthStore();
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const hasLoadedRef = useRef(false);
+  const lastProjectIdRef = useRef<string | null>(null);  // ADD THIS LINE
   
   const {
     cells,
@@ -20,7 +23,19 @@ export function useProjectState(projectId: string) {
     setInsights,
     setTags,
     setArticleContent,
+    clearProject,  
   } = useProjectStore();
+
+  // Reset when projectId changes
+  useEffect(() => {
+    if (lastProjectIdRef.current !== null && lastProjectIdRef.current !== projectId) {
+      // Project changed - clear the store and reset the loaded flag
+      console.log('Project changed, clearing store. Old:', lastProjectIdRef.current, 'New:', projectId);
+      clearProject();
+      hasLoadedRef.current = false;
+    }
+    lastProjectIdRef.current = projectId;
+  }, [projectId, clearProject]);
 
   // Load state from database
   const loadState = useCallback(async () => {

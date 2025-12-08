@@ -190,7 +190,7 @@ export default function ProjectPage() {
           className="bg-gray-100 border-r border-gray-200 overflow-hidden shrink-0"
           style={{ width: minimapWidth }}
         >
-          <Minimap sections={minimapSections} />
+          <Minimap projectId={projectId} sections={minimapSections} />
         </div>
 
         {/* Left Resizer */}

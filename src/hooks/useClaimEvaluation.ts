@@ -271,7 +271,7 @@ useEffect(() => {
   
   // Create a new debounced function for this effect
   const debouncedDetect = debounce(() => {
-    console.log('🔄 Debounced detection triggered for text length:', text.length);
+    // console.log('🔄 Debounced detection triggered for text length:', text.length);
     detectClaims();
   }, 1000); // Reduced from 2000ms to 1000ms
   
@@ -305,12 +305,28 @@ useEffect(() => {
     return;
   }
   
-  // Create a comprehensive hash to detect meaningful notebook changes
+  // Create a comprehensive hash to detect ANY meaningful notebook changes
   const contextHash = JSON.stringify({
+    // Cell information
     cellCount: notebookContext.cells?.length || 0,
+    cellIds: notebookContext.cells?.map((c: any) => c.id).join(',') || '',
+    cellCodes: notebookContext.cells?.map((c: any) => c.content || '').join('|||') || '',
+    cellOutputs: notebookContext.cells?.map((c: any) => JSON.stringify(c.output || {})).join('|||') || '',
+    cellHypothesisTags: notebookContext.cells?.map((c: any) => (c.hypothesisTags || []).join(',')).join('|') || '',
+    
+    // Insight information
     insightCount: notebookContext.insights?.length || 0,
-    cellOutputs: notebookContext.cells?.map((c: any) => c.output?.text?.substring(0, 50) || '').join('|') || '',
-    insightContents: notebookContext.insights?.map((i: any) => i.content?.substring(0, 30) || '').join('|') || '',
+    insightContents: notebookContext.insights?.map((i: any) => i.content || '').join('|||') || '',
+    insightTags: notebookContext.insights?.map((i: any) => i.tagId || '').join(',') || '',
+    insightHypothesisTags: notebookContext.insights?.map((i: any) => (i.hypothesisTags || []).join(',')).join('|') || '',
+    
+    // Hypothesis information
+    hypothesisCount: notebookContext.hypotheses?.length || 0,
+    hypothesisContents: notebookContext.hypotheses?.map((h: any) => h.content || '').join('|||') || '',
+    
+    // Dataset information
+    datasetFilename: notebookContext.dataset?.filename || '',
+    datasetColumns: notebookContext.dataset?.summary?.columnNames?.join(',') || '',
   });
   
   // Skip if context hasn't changed
@@ -326,7 +342,7 @@ useEffect(() => {
   
   lastContextHashRef.current = contextHash;
   
-  console.log('📊 Notebook context changed - triggering full re-detection and re-evaluation');
+  // console.log('📊 Notebook context changed - triggering full re-detection and re-evaluation');
   
   // Force re-detection by clearing lastTextRef so detectClaims will run
   const currentText = lastTextRef.current;

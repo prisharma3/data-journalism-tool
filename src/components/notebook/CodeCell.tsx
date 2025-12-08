@@ -725,7 +725,7 @@ onClick={(e) => {
   }));
   
   // Open the insight modal for editing
-  onAddInsight(cell.id);
+  onAddInsight?.(cell.id);
 
   // DON'T clear AI suggestions yet - wait for successful save
   // Mark that we're in "accept all" mode

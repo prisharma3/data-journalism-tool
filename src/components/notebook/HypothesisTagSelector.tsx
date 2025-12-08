@@ -6,7 +6,7 @@ import { Check } from 'lucide-react';
 interface Hypothesis {
   id: string;
   content: string;
-  createdAt: Date;
+  createdAt: string;
 }
 
 interface HypothesisTagSelectorProps {

@@ -91,6 +91,8 @@ export interface User {
     position: number;
     createdAt: string;
     updatedAt: string;
+    cellId?: string;           // Which code cell this insight is attached to
+    hypothesisTags?: string[]; // Array of hypothesis IDs
   }
   
   // Writing Types
