@@ -41,6 +41,9 @@ export function useProjectState(projectId: string) {
   const loadState = useCallback(async () => {
     if (!token || !projectId || hasLoadedRef.current) return;
 
+    // IMPORTANT: Clear the store first to ensure new projects start empty
+    clearProject();
+
     try {
       const response = await fetch(`/api/projects/${projectId}/state`, {
         headers: {
@@ -59,12 +62,13 @@ export function useProjectState(projectId: string) {
           if (state.tags) setTags(state.tags);
           if (state.articleContent) setArticleContent(state.articleContent);
         }
+        // If data.state is null/undefined, store remains cleared (empty project)
         hasLoadedRef.current = true;
       }
     } catch (error) {
       console.error('Failed to load project state:', error);
     }
-  }, [token, projectId, setCells, setDataset, setHypotheses, setInsights, setTags, setArticleContent]);
+  }, [token, projectId, setCells, setDataset, setHypotheses, setInsights, setTags, setArticleContent, clearProject]);
 
   // Save state to database
   const saveState = useCallback(async () => {
