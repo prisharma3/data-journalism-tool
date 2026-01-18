@@ -5,13 +5,13 @@ export async function POST(request: NextRequest) {
   try {
     const { email, password, firstName, lastName } = await request.json();
     
-    console.log('Registration attempt for:', email);
+    // console.log('Registration attempt for:', email);
 
     // Check if user already exists
     const existingUser = await getUserByEmail(email);
     
     if (existingUser) {
-      console.log('User already exists:', email);
+      // console.log('User already exists:', email);
       return NextResponse.json(
         { error: 'User already exists' }, 
         { status: 400 }
@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
       lastName
     });
 
-    console.log('User created successfully:', email);
+    // console.log('User created successfully:', email);
 
     return NextResponse.json({
       message: 'User created successfully',
